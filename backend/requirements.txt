@@ -1,0 +1,29 @@
+# requirements.txt
+
+# ── Framework principal ───────────────────────────────────────────────
+fastapi==0.115.0          # el framework web
+uvicorn[standard]==0.30.6 # el servidor ASGI (corre FastAPI)
+
+# ── Base de datos ─────────────────────────────────────────────────────
+sqlalchemy==2.0.36        # ORM — define modelos como clases Python
+asyncpg==0.29.0           # driver async para PostgreSQL
+alembic==1.13.3           # migraciones de base de datos
+
+# ── Validación y configuración ────────────────────────────────────────
+pydantic==2.9.2           # validación de datos (FastAPI lo usa internamente)
+pydantic-settings==2.5.2  # leer configuración desde .env
+pydantic[email]==2.9.2     
+
+# ── Autenticación ─────────────────────────────────────────────────────
+python-jose[cryptography]==3.3.0  # crear y verificar JWT
+passlib[bcrypt]==1.7.4            # hashear contraseñas
+
+# ── HTTP async (para llamadas a APIs externas — WhatsApp, etc.) ───────
+httpx==0.27.2
+
+# ── Cola de tareas (Celery entra en Fase 3, pero lo dejamos listo) ────
+celery==5.4.0
+redis==5.1.1
+
+# ── Utilidades ────────────────────────────────────────────────────────
+python-multipart==0.0.12  # necesario para recibir form data en FastAPI
