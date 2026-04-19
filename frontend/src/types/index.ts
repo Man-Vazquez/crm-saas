@@ -1,148 +1,43 @@
-export interface Tenant {
-  id: string
-  name: string
-  slug: string
-  plan: string
-  is_active: boolean
-}
+// ─────────────────────────────────────────────────────────────────────────────
+// Auto-generated source: run `npm run gen:types` to refresh from the backend.
+// Do NOT edit types derived from components['schemas'] by hand — change the
+// backend schema and regenerate instead.
+// ─────────────────────────────────────────────────────────────────────────────
 
-export interface AdminUser {
-  id: string
-  email: string
-  full_name: string
-  role: 'admin' | 'supervisor' | 'agent'
-  is_active: boolean
-}
+import type { components } from './api'
 
-export interface DashboardSummary {
-  total_open: number
-  total_in_progress: number
-  total_resolved: number
-  total_closed: number
-  avg_resolution_hours: number | null
-}
+// ── Core domain types ────────────────────────────────────────────────────────
 
-export interface TicketsByStatusItem {
-  status_name: string
-  color: string
-  count: number
-}
+export type Ticket        = components['schemas']['TicketResponse']
+export type Customer      = components['schemas']['CustomerResponse']
+export type Message       = components['schemas']['MessageResponse']
+export type Channel       = components['schemas']['ChannelResponse']
+export type Tenant        = components['schemas']['TenantResponse']
 
-export interface TicketsByPriorityItem {
-  priority: string
-  count: number
-}
+// ── Auth / users ─────────────────────────────────────────────────────────────
 
-export interface TicketsByChannelItem {
-  channel: string
-  count: number
-}
+export type User      = components['schemas']['UserMe']       // GET /auth/me
+export type AdminUser = components['schemas']['UserResponse'] // GET /admin/users
 
-export interface TicketsByAgentItem {
-  agent_name: string
-  total: number
-  open: number
-  resolved: number
-}
+// ── Ticket configuration ──────────────────────────────────────────────────────
 
-export interface TicketsByTypeItem {
-  type_name: string
-  subtype_name: string | null
-  count: number
-}
+export type TicketStatus  = components['schemas']['TicketStatusResponse']
+export type TicketType    = components['schemas']['TicketTypeResponse']
+export type TicketSubtype = components['schemas']['TicketSubtypeResponse']
 
-export interface DailyTicketsItem {
-  date: string
-  count: number
-}
+// ── Metrics ───────────────────────────────────────────────────────────────────
 
-export interface User {
-  id: string
-  tenant_id: string
-  email: string
-  full_name: string
-  role: 'admin' | 'supervisor' | 'agent'
-  is_active: boolean
-}
+export type DashboardSummary      = components['schemas']['DashboardSummary']
+export type TicketsByStatusItem   = components['schemas']['TicketsByStatusItem']
+export type TicketsByPriorityItem = components['schemas']['TicketsByPriorityItem']
+export type TicketsByChannelItem  = components['schemas']['TicketsByChannelItem']
+export type TicketsByAgentItem    = components['schemas']['TicketsByAgentItem']
+export type TicketsByTypeItem     = components['schemas']['TicketsByTypeItem']
+export type DailyTicketsItem      = components['schemas']['DailyTicketsItem']
 
-export interface Customer {
-  id: string
-  tenant_id: string
-  full_name: string
-  email: string | null
-  phone: string | null
-  company: string | null
-  notes: string | null
-  custom_fields: Record<string, unknown>
-  is_active: boolean
-  created_at: string
-  updated_at: string
-}
-
-export interface TicketStatus {
-  id: string
-  tenant_id: string
-  name: string
-  color: string
-  sort_order: number
-  is_default: boolean
-  is_active: boolean
-}
-
-export interface TicketType {
-  id: string
-  tenant_id: string
-  name: string
-  description: string | null
-  is_active: boolean
-}
-
-export interface TicketSubtype {
-  id: string
-  tenant_id: string
-  type_id: string
-  name: string
-  is_active: boolean
-}
-
-export interface Ticket {
-  id: string
-  tenant_id: string
-  customer_id: string
-  assigned_to: string | null
-  status_id: string
-  type_id: string | null
-  subtype_id: string | null
-  subject: string
-  channel: string
-  channel_id: string | null
-  priority: 'low' | 'medium' | 'high' | 'urgent'
-  is_active: boolean
-  resolved_at: string | null
-  created_at: string
-  updated_at: string
-}
-
-export interface Message {
-  id: string
-  tenant_id: string
-  ticket_id: string
-  author_id: string | null
-  body: string
-  direction: 'inbound' | 'outbound'
-  msg_type: 'reply' | 'comment'
-  metadata_: Record<string, unknown>
-  created_at: string
-}
-
-export interface Channel {
-  id: string
-  tenant_id: string
-  channel_type: string
-  name: string
-  is_active: boolean
-  created_at: string
-}
+// ── Generic pagination wrapper ────────────────────────────────────────────────
+// Not in the OpenAPI schema (the backend uses inline dict returns), so it stays
+// hand-written here.
 
 export interface PaginatedResponse<T> {
   items: T[]

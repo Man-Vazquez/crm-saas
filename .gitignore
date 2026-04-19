@@ -4,3 +4,13 @@
 __pycache__/
 *.pyc
 .pytest_cache/
+
+# Generated from backend OpenAPI schema — run `npm run gen:types` to regenerate
+frontend/src/types/api.ts
+
+# Build output
+dist/
+
+# Claude Code
+.claude/
+CLAUDE.md
