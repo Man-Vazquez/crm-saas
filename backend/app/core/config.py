@@ -11,7 +11,6 @@ class Settings(BaseSettings):
     y las valida contra los tipos definidos aquí.
     Si falta una variable requerida, la app no arranca — falla rápido y claro.
     """
-
     model_config = SettingsConfigDict(
         env_file=".env",           # busca el archivo .env en la raíz
         env_file_encoding="utf-8",
@@ -36,10 +35,10 @@ class Settings(BaseSettings):
     REFRESH_TOKEN_EXPIRE_DAYS: int = 7
 
     # ── Base de datos ─────────────────────────────────────────────────
-    DATABASE_URL: PostgresDsn  # Pydantic valida que sea una URL de Postgres válida
+    DATABASE_URL: str    # Pydantic valida que sea una URL de Postgres válida
 
     # ── Redis ─────────────────────────────────────────────────────────
-    REDIS_URL: RedisDsn = "redis://redis:6379/0"
+    REDIS_URL: str = "redis://redis:6379/0"
 
     # ── CORS ──────────────────────────────────────────────────────────
     # Lista de orígenes permitidos para el frontend

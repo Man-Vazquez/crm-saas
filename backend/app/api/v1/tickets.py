@@ -1,9 +1,11 @@
 import uuid
+from uuid import UUID
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.database import get_db
 from app.core.middleware import get_current_user
 from app.core.tenant import get_tenant_id
+from app.models.user import User
 from app.schemas.ticket import (
     TicketCreate, TicketUpdate, TicketResponse,
     TicketTypeCreate, TicketTypeResponse,
@@ -12,6 +14,7 @@ from app.schemas.ticket import (
 )
 from app.schemas.message import MessageCreate, MessageResponse
 from app.services.ticket_service import TicketService
+from app.services.channel_service import ChannelService
 
 router = APIRouter(prefix="/tickets", tags=["tickets"])
 
@@ -152,3 +155,18 @@ async def list_messages(
     current_user=Depends(get_current_user),
 ):
     return await get_service().get_messages(db, ticket_id)
+
+@router.post("/{ticket_id}/reply", response_model=MessageResponse, status_code=201)
+async def reply_to_ticket(
+    ticket_id: UUID,
+    data: MessageCreate,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    service = ChannelService()
+    return await service.reply_to_ticket(
+        db=db,
+        ticket_id=ticket_id,
+        agent_id=current_user.id,
+        body=data.body,
+    )

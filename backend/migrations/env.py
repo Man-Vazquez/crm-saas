@@ -15,7 +15,6 @@ if config.config_file_name is not None:
     fileConfig(config.config_file_name)
 
 target_metadata = Base.metadata
-
 config.set_main_option("sqlalchemy.url", str(settings.DATABASE_URL))
 
 
@@ -31,10 +30,19 @@ def run_migrations_offline() -> None:
         context.run_migrations()
 
 
+def render_item(type_, obj, autogen_context):
+    """Convierte server_default='gen_random_uuid()' a sa.text() automáticamente."""
+    if type_ == "server_default" and hasattr(obj, 'arg') and obj.arg == 'gen_random_uuid()':
+        autogen_context.imports.add("from sqlalchemy import text")
+        return "sa.text('gen_random_uuid()')"
+    return False
+
+
 def do_run_migrations(connection: Connection) -> None:
     context.configure(
         connection=connection,
         target_metadata=target_metadata,
+        render_item=render_item,
         compare_type=True,
     )
     with context.begin_transaction():

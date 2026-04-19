@@ -186,3 +186,32 @@ class TicketRepository(BaseRepository):
             ).order_by(Message.created_at.asc())
         )
         return result.scalars().all()
+
+    async def create_message_direct(
+        self,
+        db: AsyncSession,
+        ticket_id: uuid.UUID,
+        author_id: uuid.UUID,
+        body: str,
+        direction: str = "outbound",
+        msg_type: str = "reply",
+        metadata: dict | None = None,
+    ) -> Message:
+        """
+        Crea un mensaje con parámetros individuales.
+        Usado por ChannelService al enviar respuestas por canal.
+        A diferencia de create_message, acepta metadata y dirección explícita.
+        """
+        message = Message(
+            tenant_id=self.tenant_id,
+            ticket_id=ticket_id,
+            author_id=author_id,
+            body=body,
+            direction=direction,
+            msg_type=msg_type,
+            metadata=metadata or {},
+        )
+        db.add(message)
+        await db.flush()
+        await db.refresh(message)
+        return message

@@ -17,6 +17,8 @@ pydantic[email]==2.9.2
 # ── Autenticación ─────────────────────────────────────────────────────
 python-jose[cryptography]==3.3.0  # crear y verificar JWT
 passlib[bcrypt]==1.7.4            # hashear contraseñas
+bcrypt==4.0.1
+cryptography==42.0.5     # ← agregar — encriptación de credenciales en DB
 
 # ── HTTP async (para llamadas a APIs externas — WhatsApp, etc.) ───────
 httpx==0.27.2
@@ -27,3 +29,8 @@ redis==5.1.1
 
 # ── Utilidades ────────────────────────────────────────────────────────
 python-multipart==0.0.12  # necesario para recibir form data en FastAPI
+
+# ── Testing ───────────────────────────────────────────────────────────
+pytest==8.3.3
+pytest-asyncio==0.24.0
+anyio==4.6.2

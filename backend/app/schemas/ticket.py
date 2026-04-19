@@ -62,6 +62,7 @@ class TicketCreate(BaseModel):
     status_id: uuid.UUID
     subject: str
     channel: str = "manual"
+    channel_id: uuid.UUID | None = None
     priority: Literal["low", "medium", "high", "urgent"] = "medium"
     type_id: uuid.UUID | None = None
     subtype_id: uuid.UUID | None = None
@@ -88,6 +89,7 @@ class TicketResponse(BaseModel):
     subtype_id: uuid.UUID | None
     subject: str
     channel: str
+    channel_id: uuid.UUID | None
     priority: str
     is_active: bool
     resolved_at: datetime | None

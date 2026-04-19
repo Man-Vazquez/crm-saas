@@ -1,8 +1,7 @@
 import uuid
-from sqlalchemy import String, Boolean, ForeignKey, Text
+from sqlalchemy import String, Boolean, ForeignKey, Text, TIMESTAMP, text as sa_text
 from sqlalchemy.orm import Mapped, mapped_column
 from sqlalchemy.dialects.postgresql import UUID
-from sqlalchemy import TIMESTAMP
 from datetime import datetime, timezone
 from app.core.database import Base
 
@@ -11,7 +10,7 @@ class Ticket(Base):
     __tablename__ = "tickets"
 
     id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), primary_key=True, server_default="gen_random_uuid()"
+        UUID(as_uuid=True), primary_key=True, server_default=sa_text("gen_random_uuid()")
     )
     tenant_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), ForeignKey("tenants.id"), nullable=False, index=True
@@ -33,6 +32,11 @@ class Ticket(Base):
     )
     subject: Mapped[str] = mapped_column(String(500), nullable=False)
     channel: Mapped[str] = mapped_column(String(50), nullable=False, default="manual")
+    channel_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("channels.id", ondelete="SET NULL"),
+        nullable=True,
+    )
     priority: Mapped[str] = mapped_column(String(20), nullable=False, default="medium")
     is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
     resolved_at: Mapped[datetime | None] = mapped_column(TIMESTAMP(timezone=True), nullable=True)

@@ -1,13 +1,12 @@
 # backend/app/api/v1/auth.py
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select
-from jose import JWTError
 from uuid import UUID
 
 from app.core.database import get_db
 from app.core.security import decode_token
+from app.core.middleware import get_current_user
 from app.schemas.auth import (
     LoginRequest,
     RefreshRequest,
@@ -18,27 +17,6 @@ from app.services.auth_service import AuthService
 from app.models.user import User
 
 router = APIRouter(prefix="/auth", tags=["auth"])
-
-
-# ── Dependencia reutilizable ──────────────────────────────────────────
-# Definida ANTES de los endpoints que la usan
-async def get_current_user(
-    db: AsyncSession = Depends(get_db),
-) -> User:
-    """
-    Lee el token del header, lo decodifica, y devuelve el usuario activo.
-    Se inyecta en cualquier endpoint protegido con Depends(get_current_user).
-    """
-    from fastapi import Request
-    from fastapi.security.utils import get_authorization_scheme_param
-    from starlette.requests import Request as StarletteRequest
-
-    # Obtenemos el token directamente desde el contexto de la request
-    # El middleware ya lo validó — aquí solo extraemos el user_id
-    raise HTTPException(
-        status_code=status.HTTP_501_NOT_IMPLEMENTED,
-        detail="get_current_user se implementa en la siguiente iteración",
-    )
 
 
 # ── Endpoints ─────────────────────────────────────────────────────────

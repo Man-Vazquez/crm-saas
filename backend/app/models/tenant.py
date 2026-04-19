@@ -1,6 +1,6 @@
 import uuid
 from datetime import datetime, timezone
-from sqlalchemy import String, Boolean, DateTime, Enum as SAEnum
+from sqlalchemy import String, Boolean, DateTime, Enum as SAEnum, text as sa_text
 from sqlalchemy.orm import Mapped, mapped_column
 from sqlalchemy.dialects.postgresql import UUID
 import enum
@@ -35,7 +35,7 @@ class Tenant(Base):
     id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True),
         primary_key=True,
-        server_default="gen_random_uuid()",   # función nativa de PostgreSQL 13+
+        server_default=sa_text("gen_random_uuid()"),   # función nativa de PostgreSQL 13+
     )
 
     # ── Datos de la cuenta ────────────────────────────────────────────
