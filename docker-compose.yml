@@ -66,9 +66,10 @@ services:
   beat:
     build:
       context: ./backend
-    command: celery -A app.workers.celery_app beat --loglevel=info
+    command: celery -A app.workers.celery_app beat --loglevel=info --schedule=/app/celerybeat/celerybeat-schedule
     volumes:
       - ./backend:/app
+      - celerybeat_data:/app/celerybeat
     env_file:
       - .env
     depends_on:
@@ -78,3 +79,4 @@ services:
 
 volumes:
   postgres_data:
+  celerybeat_data:

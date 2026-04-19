@@ -12,6 +12,12 @@ from app.core.encryption import decrypt_config
 
 logger = logging.getLogger(__name__)
 
+# IMAP keyword used to track emails already processed by this system.
+# DEUDA TÉCNICA: Las etiquetas IMAP (keywords) funcionan bien con Gmail.
+# Verificar compatibilidad con Outlook (Exchange), Thunderbird y otros
+# proveedores antes de usar en producción con clientes no-Gmail.
+PROCESSED_LABEL = "CRM-Procesado"
+
 
 class EmailChannel(BaseChannel):
 
@@ -64,7 +70,17 @@ class EmailChannel(BaseChannel):
             imap.login(self.config["smtp_user"], self.config["smtp_password"])
             imap.select("INBOX")
 
-            _, message_ids = imap.search(None, "UNSEEN")
+            # Prefer label-based search so re-polling after a crash doesn't
+            # re-process emails that were already handled (SEEN can be reset
+            # by other mail clients).  Fall back to UNSEEN on servers that
+            # don't support custom keywords (RFC 5788).
+            try:
+                status, message_ids = imap.search(None, f'UNKEYWORD "{PROCESSED_LABEL}"', "UNSEEN")
+                if status != "OK":
+                    raise imaplib.IMAP4.error("UNKEYWORD search failed")
+            except imaplib.IMAP4.error:
+                logger.warning("Servidor IMAP no soporta UNKEYWORD — usando UNSEEN como fallback")
+                _, message_ids = imap.search(None, "UNSEEN")
 
             for msg_id in message_ids[0].split():
                 try:
@@ -75,7 +91,16 @@ class EmailChannel(BaseChannel):
 
                     if inbound:
                         messages.append(inbound)
+                        # Mark as read (existing behaviour) and apply the
+                        # processed label so we never re-process this email.
                         imap.store(msg_id, "+FLAGS", "\\Seen")
+                        try:
+                            imap.store(msg_id, "+FLAGS", PROCESSED_LABEL)
+                        except Exception as label_err:
+                            logger.warning(
+                                f"No se pudo aplicar etiqueta '{PROCESSED_LABEL}' "
+                                f"al email {msg_id}: {label_err}"
+                            )
 
                 except Exception as e:
                     logger.error(f"Error procesando email {msg_id}: {e}")
