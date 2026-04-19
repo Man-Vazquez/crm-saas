@@ -2,6 +2,8 @@ import { useEffect, useState } from 'react'
 import { getCustomers } from '../api/customers'
 import type { Customer } from '../types'
 import Pagination from '../components/common/Pagination'
+import ErrorMessage from '../components/common/ErrorMessage'
+import LoadingSpinner from '../components/common/LoadingSpinner'
 
 const LIMIT = 20
 
@@ -11,9 +13,11 @@ export default function Customers() {
   const [page, setPage] = useState(1)
   const [search, setSearch] = useState('')
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
 
   const loadCustomers = (currentPage: number) => {
     setLoading(true)
+    setError(null)
     getCustomers({
       skip: (currentPage - 1) * LIMIT,
       limit: LIMIT,
@@ -23,6 +27,7 @@ export default function Customers() {
         setCustomers(res.items)
         setTotal(res.total)
       })
+      .catch(() => setError('No se pudieron cargar los clientes. Verifica tu conexión.'))
       .finally(() => setLoading(false))
   }
 
@@ -59,9 +64,13 @@ export default function Customers() {
         />
       </div>
 
+      {error && (
+        <ErrorMessage message={error} onRetry={() => loadCustomers(page)} />
+      )}
+
       <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
         {loading ? (
-          <div className="p-8 text-center text-sm text-gray-500">Cargando...</div>
+          <LoadingSpinner />
         ) : customers.length === 0 ? (
           <div className="p-8 text-center text-sm text-gray-500">No hay clientes</div>
         ) : (

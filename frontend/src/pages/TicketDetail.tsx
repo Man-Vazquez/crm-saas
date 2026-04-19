@@ -3,6 +3,8 @@ import { useParams, useNavigate } from 'react-router-dom'
 import { getTicket, getMessages, createMessage, replyTicket, getStatuses } from '../api/tickets'
 import { getCustomer } from '../api/customers'
 import type { Ticket, Message, TicketStatus, Customer } from '../types'
+import ErrorMessage from '../components/common/ErrorMessage'
+import LoadingSpinner from '../components/common/LoadingSpinner'
 
 const PRIORITY_LABEL: Record<string, string> = {
   low: 'Baja', medium: 'Media', high: 'Alta', urgent: 'Urgente',
@@ -20,9 +22,12 @@ export default function TicketDetail() {
   const [msgType, setMsgType] = useState<'reply' | 'comment'>('reply')
   const [sending, setSending] = useState(false)
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
 
-  useEffect(() => {
+  const loadData = () => {
     if (!id) return
+    setLoading(true)
+    setError(null)
     Promise.all([
       getTicket(id),
       getMessages(id),
@@ -33,7 +38,12 @@ export default function TicketDetail() {
       setStatuses(s)
       return getCustomer(t.customer_id)
     }).then(setCustomer)
+      .catch(() => setError('No se pudieron cargar los datos del ticket. Verifica tu conexión.'))
       .finally(() => setLoading(false))
+  }
+
+  useEffect(() => {
+    loadData()
   }, [id])
 
   const getStatusName = (statusId: string) =>
@@ -59,7 +69,8 @@ export default function TicketDetail() {
     }
   }
 
-  if (loading) return <div className="p-6 text-sm text-gray-500">Cargando...</div>
+  if (loading) return <div className="p-6"><LoadingSpinner /></div>
+  if (error) return <div className="p-6"><ErrorMessage message={error} onRetry={loadData} /></div>
   if (!ticket) return <div className="p-6 text-sm text-gray-500">Ticket no encontrado</div>
 
   return (

@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react'
 import { getMetricsByAgent, getMetricsByType, getMetricsByChannel } from '../api/tickets'
 import type { TicketsByAgentItem, TicketsByTypeItem, TicketsByChannelItem } from '../types'
+import ErrorMessage from '../components/common/ErrorMessage'
+import LoadingSpinner from '../components/common/LoadingSpinner'
 
 type Tab = 'agents' | 'types' | 'channels'
 
@@ -16,17 +18,23 @@ export default function Reports() {
   const [types, setTypes] = useState<TicketsByTypeItem[]>([])
   const [channels, setChannels] = useState<TicketsByChannelItem[]>([])
   const [loading, setLoading] = useState(true)
-  const [error, setError] = useState(false)
+  const [error, setError] = useState<string | null>(null)
 
-  useEffect(() => {
+  const loadData = () => {
+    setLoading(true)
+    setError(null)
     Promise.all([getMetricsByAgent(), getMetricsByType(), getMetricsByChannel()])
       .then(([a, t, c]) => {
         setAgents(a)
         setTypes(t)
         setChannels(c)
       })
-      .catch(() => setError(true))
+      .catch(() => setError('No se pudieron cargar los reportes. Verifica tu conexión.'))
       .finally(() => setLoading(false))
+  }
+
+  useEffect(() => {
+    loadData()
   }, [])
 
   return (
@@ -53,13 +61,11 @@ export default function Reports() {
       </div>
 
       {error && (
-        <p className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-md px-4 py-3 mb-4">
-          Error al cargar los reportes.
-        </p>
+        <ErrorMessage message={error} onRetry={loadData} />
       )}
 
       {loading ? (
-        <div className="h-48 bg-gray-100 rounded-lg animate-pulse" />
+        <LoadingSpinner />
       ) : (
         <>
           {/* By agent */}

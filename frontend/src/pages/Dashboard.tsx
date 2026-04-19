@@ -11,6 +11,7 @@ import {
   getMetricsByPriority,
   getMetricsDaily,
 } from '../api/tickets'
+import ErrorMessage from '../components/common/ErrorMessage'
 import type {
   DashboardSummary,
   TicketsByStatusItem,
@@ -55,9 +56,11 @@ export default function Dashboard() {
   const [byPriority, setByPriority] = useState<TicketsByPriorityItem[]>([])
   const [daily, setDaily] = useState<DailyTicketsItem[]>([])
   const [loading, setLoading] = useState(true)
-  const [error, setError] = useState(false)
+  const [error, setError] = useState<string | null>(null)
 
-  useEffect(() => {
+  const loadData = () => {
+    setLoading(true)
+    setError(null)
     Promise.all([
       getMetricsSummary(),
       getMetricsByStatus(),
@@ -70,8 +73,12 @@ export default function Dashboard() {
         setByPriority(p)
         setDaily(d)
       })
-      .catch(() => setError(true))
+      .catch(() => setError('No se pudieron cargar las métricas. Verifica tu conexión.'))
       .finally(() => setLoading(false))
+  }
+
+  useEffect(() => {
+    loadData()
   }, [])
 
   if (loading) {
@@ -95,9 +102,7 @@ export default function Dashboard() {
   if (error) {
     return (
       <div className="p-6">
-        <p className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-md px-4 py-3">
-          Error al cargar el dashboard. Verifica tu conexión e intenta de nuevo.
-        </p>
+        <ErrorMessage message={error} onRetry={loadData} />
       </div>
     )
   }

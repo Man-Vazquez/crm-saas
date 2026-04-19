@@ -31,6 +31,14 @@ function flushQueue(newToken: string) {
 client.interceptors.response.use(
   (response) => response,
   async (error) => {
+    // No response at all → network/server unreachable
+    if (!error.response) {
+      const networkError = new Error(
+        'Error de conexión. Verifica que el servidor esté corriendo.'
+      )
+      return Promise.reject(networkError)
+    }
+
     const original = error.config
 
     if (error.response?.status !== 401) {

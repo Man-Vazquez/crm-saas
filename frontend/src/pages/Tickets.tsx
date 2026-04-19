@@ -4,6 +4,8 @@ import { getTickets, getStatuses } from '../api/tickets'
 import type { Ticket, TicketStatus } from '../types'
 import CreateTicketModal from '../components/tickets/CreateTicketModal'
 import Pagination from '../components/common/Pagination'
+import ErrorMessage from '../components/common/ErrorMessage'
+import LoadingSpinner from '../components/common/LoadingSpinner'
 
 const PRIORITY_LABEL: Record<string, string> = {
   low: 'Baja',
@@ -28,6 +30,7 @@ export default function Tickets() {
   const [total, setTotal] = useState(0)
   const [page, setPage] = useState(1)
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
   const [statusFilter, setStatusFilter] = useState('')
   const [showCreateModal, setShowCreateModal] = useState(false)
 
@@ -37,6 +40,7 @@ export default function Tickets() {
 
   const loadTickets = (currentPage: number) => {
     setLoading(true)
+    setError(null)
     getTickets({
       skip: (currentPage - 1) * LIMIT,
       limit: LIMIT,
@@ -46,6 +50,7 @@ export default function Tickets() {
         setTickets(res.items)
         setTotal(res.total)
       })
+      .catch(() => setError('No se pudieron cargar los tickets. Verifica tu conexión.'))
       .finally(() => setLoading(false))
   }
 
@@ -109,10 +114,14 @@ export default function Tickets() {
         </select>
       </div>
 
+      {error && (
+        <ErrorMessage message={error} onRetry={() => loadTickets(page)} />
+      )}
+
       {/* Tabla */}
       <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
         {loading ? (
-          <div className="p-8 text-center text-sm text-gray-500">Cargando...</div>
+          <LoadingSpinner />
         ) : tickets.length === 0 ? (
           <div className="p-8 text-center text-sm text-gray-500">No hay tickets</div>
         ) : (

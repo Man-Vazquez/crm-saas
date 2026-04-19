@@ -9,6 +9,8 @@ import {
 } from '../api/admin'
 import { getChannels, createChannel } from '../api/channels'
 import type { AdminUser, Channel, Tenant } from '../types'
+import ErrorMessage from '../components/common/ErrorMessage'
+import LoadingSpinner from '../components/common/LoadingSpinner'
 
 type Tab = 'users' | 'channels' | 'account'
 
@@ -312,42 +314,51 @@ export default function Admin() {
   // Users
   const [users, setUsers] = useState<AdminUser[]>([])
   const [usersLoading, setUsersLoading] = useState(false)
+  const [usersError, setUsersError] = useState<string | null>(null)
   const [showCreateUser, setShowCreateUser] = useState(false)
   const [editingUser, setEditingUser] = useState<AdminUser | null>(null)
 
   // Channels
   const [channels, setChannels] = useState<Channel[]>([])
   const [channelsLoading, setChannelsLoading] = useState(false)
+  const [channelsError, setChannelsError] = useState<string | null>(null)
   const [showCreateChannel, setShowCreateChannel] = useState(false)
 
   // Account
   const [tenant, setTenant] = useState<Tenant | null>(null)
   const [tenantLoading, setTenantLoading] = useState(false)
+  const [tenantError, setTenantError] = useState<string | null>(null)
   const [tenantName, setTenantName] = useState('')
   const [savingTenant, setSavingTenant] = useState(false)
   const [tenantSaved, setTenantSaved] = useState(false)
 
   const loadUsers = () => {
     setUsersLoading(true)
+    setUsersError(null)
     getAdminUsers()
       .then(setUsers)
+      .catch(() => setUsersError('No se pudieron cargar los usuarios. Verifica tu conexión.'))
       .finally(() => setUsersLoading(false))
   }
 
   const loadChannels = () => {
     setChannelsLoading(true)
+    setChannelsError(null)
     getChannels()
       .then(setChannels)
+      .catch(() => setChannelsError('No se pudieron cargar los canales. Verifica tu conexión.'))
       .finally(() => setChannelsLoading(false))
   }
 
   const loadTenant = () => {
     setTenantLoading(true)
+    setTenantError(null)
     getAdminTenant()
       .then(t => {
         setTenant(t)
         setTenantName(t.name)
       })
+      .catch(() => setTenantError('No se pudieron cargar los datos de la cuenta. Verifica tu conexión.'))
       .finally(() => setTenantLoading(false))
   }
 
@@ -410,9 +421,12 @@ export default function Admin() {
               Nuevo usuario
             </button>
           </div>
+          {usersError && (
+            <ErrorMessage message={usersError} onRetry={loadUsers} />
+          )}
           <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
             {usersLoading ? (
-              <div className="p-8 text-center text-sm text-gray-400">Cargando...</div>
+              <LoadingSpinner />
             ) : users.length === 0 ? (
               <div className="p-8 text-center text-sm text-gray-400">No hay usuarios</div>
             ) : (
@@ -492,9 +506,12 @@ export default function Admin() {
               Nuevo canal
             </button>
           </div>
+          {channelsError && (
+            <ErrorMessage message={channelsError} onRetry={loadChannels} />
+          )}
           <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
             {channelsLoading ? (
-              <div className="p-8 text-center text-sm text-gray-400">Cargando...</div>
+              <LoadingSpinner />
             ) : channels.length === 0 ? (
               <div className="p-8 text-center text-sm text-gray-400">No hay canales configurados</div>
             ) : (
@@ -534,8 +551,11 @@ export default function Admin() {
       {/* ── Account tab ── */}
       {activeTab === 'account' && (
         <div className="max-w-md">
+          {tenantError && (
+            <ErrorMessage message={tenantError} onRetry={loadTenant} />
+          )}
           {tenantLoading ? (
-            <div className="h-32 bg-gray-100 rounded-lg animate-pulse" />
+            <LoadingSpinner />
           ) : (
             <div className="bg-white border border-gray-200 rounded-lg p-6 space-y-4">
               <form onSubmit={handleSaveTenant} className="space-y-4">
