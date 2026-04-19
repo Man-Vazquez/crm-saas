@@ -170,7 +170,7 @@ export default function Dashboard() {
                   axisLine={false}
                 />
                 <Tooltip
-                  formatter={(value: number) => [value, 'Tickets']}
+                  formatter={(value) => [value, 'Tickets']}
                   contentStyle={{ fontSize: 12, borderRadius: 6, border: '1px solid #E5E7EB' }}
                 />
                 <Bar dataKey="count" radius={[4, 4, 0, 0]}>
@@ -206,7 +206,7 @@ export default function Dashboard() {
                   ))}
                 </Pie>
                 <Tooltip
-                  formatter={(value: number) => [value, 'Tickets']}
+                  formatter={(value) => [value, 'Tickets']}
                   contentStyle={{ fontSize: 12, borderRadius: 6, border: '1px solid #E5E7EB' }}
                 />
                 <Legend
@@ -253,7 +253,7 @@ export default function Dashboard() {
                 axisLine={false}
               />
               <Tooltip
-                formatter={(value: number) => [value, 'Tickets']}
+                formatter={(value) => [value, 'Tickets']}
                 labelFormatter={(label) => `Fecha: ${label}`}
                 contentStyle={{ fontSize: 12, borderRadius: 6, border: '1px solid #E5E7EB' }}
               />

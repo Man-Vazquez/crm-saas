@@ -83,8 +83,45 @@ Copy `.env.example` to `.env` before running. The backend reads config from `app
 
 ## Current State
 
-### Phase 3 — Omnichannel (in progress)
-**Completed:**
+### Phase 4 — Metrics, Admin & Testing (completed)
+
+**Backend — new files:**
+- `backend/app/repositories/metrics_repo.py` — MetricsRepository with 8 query methods
+- `backend/app/services/metrics_service.py` — orchestrates MetricsRepository
+- `backend/app/schemas/metrics.py` — response schemas for metrics
+- `backend/app/api/v1/metrics.py` — 7 metrics endpoints
+- `backend/app/api/v1/admin.py` — User CRUD + tenant management
+
+**Frontend — new files:**
+- `frontend/src/pages/Dashboard.tsx` — Recharts dashboard (BarChart, PieChart donut, AreaChart)
+- `frontend/src/pages/Reports.tsx` — reports page with 3 tabs (agents, types, channels)
+- `frontend/src/pages/Admin.tsx` — admin panel with 3 tabs (users, channels, account)
+- `frontend/src/api/admin.ts` — API functions for admin panel
+- `frontend/src/api/tickets.ts` — 7 metrics functions added
+
+**Testing — new files:**
+- `backend/pytest.ini` — pytest config with `asyncio_mode = auto`
+- `backend/tests/conftest.py` — global fixtures, `crm_test` DB, `NullPool`
+- `backend/tests/test_auth.py` — 7 tests
+- `backend/tests/test_tickets.py` — 11 tests
+- `backend/tests/test_customers.py` — 7 tests
+- `backend/tests/test_metrics.py` — 8 tests
+- `backend/tests/test_admin.py` — 8 tests
+- **Total: 41/41 PASSED**
+
+**Dependencies added:**
+- Backend: `pytest==8.3.3`, `pytest-asyncio==0.24.0`, `anyio==4.6.2`
+- Frontend: `recharts`
+
+**Frontend routes:**
+- `/` → Dashboard
+- `/tickets` → Ticket list
+- `/tickets/:id` → Ticket detail
+- `/customers` → Customers
+- `/reports` → Reports
+- `/admin` → Admin panel
+
+### Phase 3 — Omnichannel (completed)
 - Celery + Redis + Beat scheduler running
 - `channels` and `agent_channels` tables in DB
 - `BaseChannel` abstract interface with `InboundMessage` / `OutboundMessage`
@@ -101,16 +138,19 @@ Copy `.env.example` to `.env` before running. The backend reads config from `app
 - Ticket creation modal in frontend
 - Reply routing: uses `/reply` for email tickets, `/messages` for manual/notes
 
-**Pending:**
+**Pending (backlog):**
 - Frontend does not auto-refresh when new inbound ticket arrives (polling or websocket needed)
 - WhatsApp adapter (deferred)
 - Error states in frontend components
 - Pagination in ticket/customer lists
 - openapi-typescript for auto-generated types
-- Admin panel for channel management in frontend
+- Admin panel for channel management in frontend (UI exists, backend CRUD exists)
 - `process_incoming_message` does not deduplicate yet (external_id check pending)
 
 ## Critical Conventions
+
+### Frontend
+- `NavLink` with `to="/"` requires `end={true}` — without it, the Dashboard link stays active on every route since all paths start with `/`
 
 ### Migrations
 - Always use `sa.text('gen_random_uuid()')` for UUID server defaults — never a plain string
@@ -129,6 +169,21 @@ Copy `.env.example` to `.env` before running. The backend reads config from `app
 - Channel credentials (passwords, tokens) are encrypted before DB storage
 - Fields ending in `_password`, `_token`, `_secret` are encrypted automatically
 - Encrypted values are prefixed with `enc:` in JSONB
+
+### Testing
+
+```bash
+docker compose exec api pytest -v                        # run all tests
+docker compose exec api pytest tests/test_auth.py -v     # run single file
+```
+
+Test DB is `crm_test` (same Postgres instance). Tables are created once per session via `setup_database` fixture; data is truncated between tests via `clean_db` (autouse).
+
+Key decisions in `conftest.py`:
+- `NullPool` — required because `BaseHTTPMiddleware` spawns a new asyncio task per request; a shared connection pool causes greenlet context conflicts with asyncpg
+- `_get_test_db` mirrors `get_db` exactly, including `await session.commit()` — without this, flushed data is rolled back when the session closes and subsequent requests see nothing
+- `DO $$ BEGIN CREATE TYPE ... EXCEPTION WHEN duplicate_object THEN NULL; END $$;` — asyncpg does not support `CREATE TYPE IF NOT EXISTS`
+- `server_default` on UUID columns must use `sa_text("gen_random_uuid()")`, never a plain string — plain strings get quoted as literals in DDL and fail UUID type validation
 
 ### Known Tech Debt
 1. TypeScript types are manually maintained — no openapi-typescript yet

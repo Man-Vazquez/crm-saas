@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { getTickets, getStatuses } from '../api/tickets'
 import type { Ticket, TicketStatus } from '../types'
 import CreateTicketModal from '../components/tickets/CreateTicketModal'
+import Pagination from '../components/common/Pagination'
 
 const PRIORITY_LABEL: Record<string, string> = {
   low: 'Baja',
@@ -18,11 +19,14 @@ const PRIORITY_COLOR: Record<string, string> = {
   urgent: 'bg-red-100 text-red-700',
 }
 
+const LIMIT = 20
+
 export default function Tickets() {
   const navigate = useNavigate()
   const [tickets, setTickets] = useState<Ticket[]>([])
   const [statuses, setStatuses] = useState<TicketStatus[]>([])
   const [total, setTotal] = useState(0)
+  const [page, setPage] = useState(1)
   const [loading, setLoading] = useState(true)
   const [statusFilter, setStatusFilter] = useState('')
   const [showCreateModal, setShowCreateModal] = useState(false)
@@ -31,9 +35,13 @@ export default function Tickets() {
     getStatuses().then(setStatuses)
   }, [])
 
-  const loadTickets = () => {
+  const loadTickets = (currentPage: number) => {
     setLoading(true)
-    getTickets({ status_id: statusFilter || undefined })
+    getTickets({
+      skip: (currentPage - 1) * LIMIT,
+      limit: LIMIT,
+      status_id: statusFilter || undefined,
+    })
       .then((res) => {
         setTickets(res.items)
         setTotal(res.total)
@@ -42,8 +50,18 @@ export default function Tickets() {
   }
 
   useEffect(() => {
-    loadTickets()
+    setPage(1)
+    loadTickets(1)
   }, [statusFilter])
+
+  useEffect(() => {
+    loadTickets(page)
+  }, [page])
+
+  const handlePageChange = (newPage: number) => {
+    setPage(newPage)
+    window.scrollTo({ top: 0, behavior: 'smooth' })
+  }
 
   const getStatusName = (id: string) =>
     statuses.find((s) => s.id === id)?.name ?? '—'
@@ -72,7 +90,7 @@ export default function Tickets() {
           onClose={() => setShowCreateModal(false)}
           onCreated={() => {
             setShowCreateModal(false)
-            loadTickets()
+            loadTickets(page)
           }}
         />
       )}
@@ -98,48 +116,51 @@ export default function Tickets() {
         ) : tickets.length === 0 ? (
           <div className="p-8 text-center text-sm text-gray-500">No hay tickets</div>
         ) : (
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b border-gray-200 bg-gray-50">
-                <th className="text-left px-4 py-3 font-medium text-gray-600">Asunto</th>
-                <th className="text-left px-4 py-3 font-medium text-gray-600">Estado</th>
-                <th className="text-left px-4 py-3 font-medium text-gray-600">Prioridad</th>
-                <th className="text-left px-4 py-3 font-medium text-gray-600">Canal</th>
-                <th className="text-left px-4 py-3 font-medium text-gray-600">Fecha</th>
-              </tr>
-            </thead>
-            <tbody>
-              {tickets.map((ticket) => (
-                <tr
-                  key={ticket.id}
-                  onClick={() => navigate(`/tickets/${ticket.id}`)}
-                  className="border-b border-gray-100 hover:bg-gray-50 cursor-pointer transition-colors last:border-0"
-                >
-                  <td className="px-4 py-3 font-medium text-gray-900">{ticket.subject}</td>
-                  <td className="px-4 py-3">
-                    <span
-                      className="px-2 py-1 rounded-full text-xs font-medium"
-                      style={{
-                        backgroundColor: getStatusColor(ticket.status_id) + '20',
-                        color: getStatusColor(ticket.status_id),
-                      }}
-                    >
-                      {getStatusName(ticket.status_id)}
-                    </span>
-                  </td>
-                  <td className="px-4 py-3">
-                    <span className={`px-2 py-1 rounded-full text-xs font-medium ${PRIORITY_COLOR[ticket.priority]}`}>
-                      {PRIORITY_LABEL[ticket.priority]}
-                    </span>
-                  </td>
-                  <td className="px-4 py-3 text-gray-600 capitalize">{ticket.channel}</td>
-                  <td className="px-4 py-3 text-gray-500">
-                    {new Date(ticket.created_at).toLocaleDateString('es-MX')}
-                  </td>
+          <>
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-gray-200 bg-gray-50">
+                  <th className="text-left px-4 py-3 font-medium text-gray-600">Asunto</th>
+                  <th className="text-left px-4 py-3 font-medium text-gray-600">Estado</th>
+                  <th className="text-left px-4 py-3 font-medium text-gray-600">Prioridad</th>
+                  <th className="text-left px-4 py-3 font-medium text-gray-600">Canal</th>
+                  <th className="text-left px-4 py-3 font-medium text-gray-600">Fecha</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {tickets.map((ticket) => (
+                  <tr
+                    key={ticket.id}
+                    onClick={() => navigate(`/tickets/${ticket.id}`)}
+                    className="border-b border-gray-100 hover:bg-gray-50 cursor-pointer transition-colors last:border-0"
+                  >
+                    <td className="px-4 py-3 font-medium text-gray-900">{ticket.subject}</td>
+                    <td className="px-4 py-3">
+                      <span
+                        className="px-2 py-1 rounded-full text-xs font-medium"
+                        style={{
+                          backgroundColor: getStatusColor(ticket.status_id) + '20',
+                          color: getStatusColor(ticket.status_id),
+                        }}
+                      >
+                        {getStatusName(ticket.status_id)}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3">
+                      <span className={`px-2 py-1 rounded-full text-xs font-medium ${PRIORITY_COLOR[ticket.priority]}`}>
+                        {PRIORITY_LABEL[ticket.priority]}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3 text-gray-600 capitalize">{ticket.channel}</td>
+                    <td className="px-4 py-3 text-gray-500">
+                      {new Date(ticket.created_at).toLocaleDateString('es-MX')}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            <Pagination total={total} page={page} limit={LIMIT} onChange={handlePageChange} />
+          </>
         )}
       </div>
     </div>
