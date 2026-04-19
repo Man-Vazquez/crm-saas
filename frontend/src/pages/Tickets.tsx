@@ -1,7 +1,9 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { getTickets, getStatuses } from '../api/tickets'
 import type { Ticket, TicketStatus } from '../types'
+import { useAuthStore } from '../store/authStore'
+import { usePolling } from '../hooks/usePolling'
 import CreateTicketModal from '../components/tickets/CreateTicketModal'
 import Pagination from '../components/common/Pagination'
 import ErrorMessage from '../components/common/ErrorMessage'
@@ -25,6 +27,8 @@ const LIMIT = 20
 
 export default function Tickets() {
   const navigate = useNavigate()
+  const isAuthenticated = useAuthStore((s) => s.isAuthenticated)
+
   const [tickets, setTickets] = useState<Ticket[]>([])
   const [statuses, setStatuses] = useState<TicketStatus[]>([])
   const [total, setTotal] = useState(0)
@@ -34,39 +38,96 @@ export default function Tickets() {
   const [statusFilter, setStatusFilter] = useState('')
   const [showCreateModal, setShowCreateModal] = useState(false)
 
+  // Timestamp of the last successful fetch; null until the first load completes
+  const [lastUpdated, setLastUpdated] = useState<Date | null>(null)
+  // Seconds since last update, recalculated every second for the status text
+  const [secondsSince, setSecondsSince] = useState(0)
+
+  // Keep a stable ref to the current page so the polling callback always
+  // uses the latest value without needing to be recreated.
+  const pageRef = useRef(page)
+  useEffect(() => { pageRef.current = page }, [page])
+
+  const statusFilterRef = useRef(statusFilter)
+  useEffect(() => { statusFilterRef.current = statusFilter }, [statusFilter])
+
   useEffect(() => {
     getStatuses().then(setStatuses)
   }, [])
 
-  const loadTickets = (currentPage: number) => {
-    setLoading(true)
-    setError(null)
+  /**
+   * Main fetch function.
+   * @param currentPage  Page to load.
+   * @param silent       When true: skips the loading spinner and does NOT
+   *                     modify the error state (poll-triggered refresh).
+   */
+  const loadTickets = (currentPage: number, silent = false) => {
+    if (!silent) {
+      setLoading(true)
+      setError(null)
+    }
     getTickets({
       skip: (currentPage - 1) * LIMIT,
       limit: LIMIT,
-      status_id: statusFilter || undefined,
+      status_id: statusFilterRef.current || undefined,
     })
       .then((res) => {
         setTickets(res.items)
         setTotal(res.total)
+        setLastUpdated(new Date())
+        setSecondsSince(0)
       })
-      .catch(() => setError('No se pudieron cargar los tickets. Verifica tu conexión.'))
-      .finally(() => setLoading(false))
+      .catch(() => {
+        // Silent polls fail quietly; only surface errors on explicit loads
+        if (!silent) {
+          setError('No se pudieron cargar los tickets. Verifica tu conexión.')
+        }
+      })
+      .finally(() => {
+        if (!silent) setLoading(false)
+      })
   }
 
+  // Reset to page 1 whenever the filter changes
   useEffect(() => {
     setPage(1)
     loadTickets(1)
   }, [statusFilter])
 
+  // Load when page changes (skip the very first render — the filter effect handles it)
+  const isFirstRender = useRef(true)
   useEffect(() => {
+    if (isFirstRender.current) { isFirstRender.current = false; return }
     loadTickets(page)
   }, [page])
+
+  // Polling — silent refresh every 30 s while the user is authenticated
+  usePolling(
+    () => loadTickets(pageRef.current, true),
+    30_000,
+    isAuthenticated,
+  )
+
+  // Tick the "updated X sec ago" counter every second
+  useEffect(() => {
+    const id = setInterval(() => {
+      setSecondsSince((s) => s + 1)
+    }, 1_000)
+    return () => clearInterval(id)
+  }, [])
 
   const handlePageChange = (newPage: number) => {
     setPage(newPage)
     window.scrollTo({ top: 0, behavior: 'smooth' })
   }
+
+  const updatedLabel = (() => {
+    if (!lastUpdated) return null
+    if (secondsSince < 5) return 'Actualizado ahora'
+    if (secondsSince < 60) return `Actualizado hace ${secondsSince} seg`
+    const mins = Math.floor(secondsSince / 60)
+    return `Actualizado hace ${mins} min`
+  })()
 
   const getStatusName = (id: string) =>
     statuses.find((s) => s.id === id)?.name ?? '—'
@@ -120,6 +181,11 @@ export default function Tickets() {
 
       {/* Tabla */}
       <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
+        {updatedLabel && !loading && (
+          <div className="flex justify-end px-4 pt-2">
+            <span className="text-xs text-gray-400">{updatedLabel}</span>
+          </div>
+        )}
         {loading ? (
           <LoadingSpinner />
         ) : tickets.length === 0 ? (
