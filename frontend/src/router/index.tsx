@@ -7,6 +7,8 @@ import Dashboard from '../pages/Dashboard'
 import Tickets from '../pages/Tickets'
 import TicketDetail from '../pages/TicketDetail'
 import Customers from '../pages/Customers'
+import Reports from '../pages/Reports'
+import Admin from '../pages/Admin'
 
 function PrivateRoute({ children }: { children: React.ReactNode }) {
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated)
@@ -37,11 +39,12 @@ export const router = createBrowserRouter([
       </PrivateRoute>
     ),
     children: [
-      { index: true, element: <Navigate to="/tickets" replace /> },
-      { path: 'dashboard', element: <Dashboard /> },
+      { index: true, element: <Dashboard /> },
       { path: 'tickets', element: <Tickets /> },
       { path: 'tickets/:id', element: <TicketDetail /> },
       { path: 'customers', element: <Customers /> },
+      { path: 'reports', element: <Reports /> },
+      { path: 'admin', element: <Admin /> },
     ],
   },
 ])

@@ -23,6 +23,7 @@ export const createTicket = async (payload: {
   status_id: string
   priority: string
   channel?: string
+  channel_id?: string
   type_id?: string
   subtype_id?: string
   assigned_to?: string
@@ -46,6 +47,14 @@ export const getTypes = async () => {
   return data
 }
 
+export const replyTicket = async (ticketId: string, payload: {
+  body: string
+  msg_type: 'reply' | 'comment'
+}) => {
+  const { data } = await client.post<Message>(`/tickets/${ticketId}/reply`, payload)
+  return data
+}
+
 export const getMessages = async (ticketId: string) => {
   const { data } = await client.get<Message[]>(`/tickets/${ticketId}/messages`)
   return data
@@ -58,3 +67,36 @@ export const createMessage = async (ticketId: string, payload: {
   const { data } = await client.post<Message>(`/tickets/${ticketId}/messages`, payload)
   return data
 }
+
+// ── Metrics ──────────────────────────────────────────────────────────────────
+
+import type {
+  DashboardSummary,
+  TicketsByStatusItem,
+  TicketsByPriorityItem,
+  TicketsByChannelItem,
+  TicketsByAgentItem,
+  TicketsByTypeItem,
+  DailyTicketsItem,
+} from '../types'
+
+export const getMetricsSummary = () =>
+  client.get<DashboardSummary>('/metrics/summary').then(r => r.data)
+
+export const getMetricsByStatus = () =>
+  client.get<TicketsByStatusItem[]>('/metrics/by-status').then(r => r.data)
+
+export const getMetricsByPriority = () =>
+  client.get<TicketsByPriorityItem[]>('/metrics/by-priority').then(r => r.data)
+
+export const getMetricsByChannel = () =>
+  client.get<TicketsByChannelItem[]>('/metrics/by-channel').then(r => r.data)
+
+export const getMetricsByAgent = () =>
+  client.get<TicketsByAgentItem[]>('/metrics/by-agent').then(r => r.data)
+
+export const getMetricsByType = () =>
+  client.get<TicketsByTypeItem[]>('/metrics/by-type').then(r => r.data)
+
+export const getMetricsDaily = () =>
+  client.get<DailyTicketsItem[]>('/metrics/daily').then(r => r.data)

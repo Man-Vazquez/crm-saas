@@ -3,6 +3,57 @@ export interface Tenant {
   name: string
   slug: string
   plan: string
+  is_active: boolean
+}
+
+export interface AdminUser {
+  id: string
+  email: string
+  full_name: string
+  role: 'admin' | 'supervisor' | 'agent'
+  is_active: boolean
+}
+
+export interface DashboardSummary {
+  total_open: number
+  total_in_progress: number
+  total_resolved: number
+  total_closed: number
+  avg_resolution_hours: number | null
+}
+
+export interface TicketsByStatusItem {
+  status_name: string
+  color: string
+  count: number
+}
+
+export interface TicketsByPriorityItem {
+  priority: string
+  count: number
+}
+
+export interface TicketsByChannelItem {
+  channel: string
+  count: number
+}
+
+export interface TicketsByAgentItem {
+  agent_name: string
+  total: number
+  open: number
+  resolved: number
+}
+
+export interface TicketsByTypeItem {
+  type_name: string
+  subtype_name: string | null
+  count: number
+}
+
+export interface DailyTicketsItem {
+  date: string
+  count: number
 }
 
 export interface User {
@@ -64,6 +115,7 @@ export interface Ticket {
   subtype_id: string | null
   subject: string
   channel: string
+  channel_id: string | null
   priority: 'low' | 'medium' | 'high' | 'urgent'
   is_active: boolean
   resolved_at: string | null
@@ -80,6 +132,15 @@ export interface Message {
   direction: 'inbound' | 'outbound'
   msg_type: 'reply' | 'comment'
   metadata_: Record<string, unknown>
+  created_at: string
+}
+
+export interface Channel {
+  id: string
+  tenant_id: string
+  channel_type: string
+  name: string
+  is_active: boolean
   created_at: string
 }
 

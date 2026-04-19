@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { getTickets, getStatuses } from '../api/tickets'
 import type { Ticket, TicketStatus } from '../types'
+import CreateTicketModal from '../components/tickets/CreateTicketModal'
 
 const PRIORITY_LABEL: Record<string, string> = {
   low: 'Baja',
@@ -24,12 +25,13 @@ export default function Tickets() {
   const [total, setTotal] = useState(0)
   const [loading, setLoading] = useState(true)
   const [statusFilter, setStatusFilter] = useState('')
+  const [showCreateModal, setShowCreateModal] = useState(false)
 
   useEffect(() => {
     getStatuses().then(setStatuses)
   }, [])
 
-  useEffect(() => {
+  const loadTickets = () => {
     setLoading(true)
     getTickets({ status_id: statusFilter || undefined })
       .then((res) => {
@@ -37,6 +39,10 @@ export default function Tickets() {
         setTotal(res.total)
       })
       .finally(() => setLoading(false))
+  }
+
+  useEffect(() => {
+    loadTickets()
   }, [statusFilter])
 
   const getStatusName = (id: string) =>
@@ -53,7 +59,23 @@ export default function Tickets() {
           <h1 className="text-xl font-semibold text-gray-900">Tickets</h1>
           <p className="text-sm text-gray-500 mt-0.5">{total} tickets en total</p>
         </div>
+        <button
+          onClick={() => setShowCreateModal(true)}
+          className="px-4 py-2 text-sm text-white bg-blue-600 rounded-md hover:bg-blue-700"
+        >
+          Nuevo Ticket
+        </button>
       </div>
+
+      {showCreateModal && (
+        <CreateTicketModal
+          onClose={() => setShowCreateModal(false)}
+          onCreated={() => {
+            setShowCreateModal(false)
+            loadTickets()
+          }}
+        />
+      )}
 
       {/* Filtros */}
       <div className="flex gap-3 mb-4">

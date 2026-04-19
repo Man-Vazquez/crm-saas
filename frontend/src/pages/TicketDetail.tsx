@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { getTicket, getMessages, createMessage, getStatuses } from '../api/tickets'
+import { getTicket, getMessages, createMessage, replyTicket, getStatuses } from '../api/tickets'
 import { getCustomer } from '../api/customers'
 import type { Ticket, Message, TicketStatus, Customer } from '../types'
 
@@ -42,11 +42,16 @@ export default function TicketDetail() {
   const getStatusColor = (statusId: string) =>
     statuses.find((s) => s.id === statusId)?.color ?? '#6B7280'
 
+  const usesEmailChannel = (t: typeof ticket) =>
+    msgType === 'reply' && t?.channel === 'email' && !!t.channel_id
+
   const handleSend = async () => {
     if (!id || !body.trim()) return
     setSending(true)
     try {
-      const msg = await createMessage(id, { body, msg_type: msgType })
+      const msg = usesEmailChannel(ticket)
+        ? await replyTicket(id, { body, msg_type: msgType })
+        : await createMessage(id, { body, msg_type: msgType })
       setMessages((prev) => [...prev, msg])
       setBody('')
     } finally {
@@ -146,7 +151,20 @@ export default function TicketDetail() {
               rows={4}
               className="w-full text-sm border border-gray-200 rounded-md p-3 resize-none focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
-            <div className="flex justify-end mt-2">
+            <div className="flex items-center justify-between mt-2">
+              <span className={`text-xs px-2 py-1 rounded-full font-medium ${
+                msgType === 'comment'
+                  ? 'bg-yellow-100 text-yellow-700'
+                  : usesEmailChannel(ticket)
+                  ? 'bg-blue-100 text-blue-700'
+                  : 'bg-gray-100 text-gray-500'
+              }`}>
+                {msgType === 'comment'
+                  ? 'Guardará como nota interna'
+                  : usesEmailChannel(ticket)
+                  ? 'Enviará por Email'
+                  : 'Guardará como mensaje interno'}
+              </span>
               <button
                 onClick={handleSend}
                 disabled={sending || !body.trim()}

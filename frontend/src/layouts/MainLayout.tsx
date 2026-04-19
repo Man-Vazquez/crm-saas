@@ -2,9 +2,11 @@ import { Outlet, NavLink, useNavigate } from 'react-router-dom'
 import { useAuthStore } from '../store/authStore'
 
 const navItems = [
-  { to: '/tickets', label: 'Tickets' },
-  { to: '/customers', label: 'Clientes' },
-  { to: '/dashboard', label: 'Dashboard' },
+  { to: '/', label: 'Dashboard', end: true },
+  { to: '/tickets', label: 'Tickets', end: false },
+  { to: '/customers', label: 'Clientes', end: false },
+  { to: '/reports', label: 'Reportes', end: false },
+  { to: '/admin', label: 'Admin', end: false },
 ]
 
 export default function MainLayout() {
@@ -29,6 +31,7 @@ export default function MainLayout() {
             <NavLink
               key={item.to}
               to={item.to}
+              end={item.end}
               className={({ isActive }) =>
                 `px-3 py-2 rounded-md text-sm font-medium transition-colors ${
                   isActive
