@@ -113,3 +113,37 @@ async def test_actualizar_tenant(client: AsyncClient, auth_headers, tenant):
     })
     assert resp.status_code == 200
     assert resp.json()["name"] == "Empresa Actualizada"
+
+
+@pytest.mark.asyncio
+async def test_paginacion_usuarios(
+    client: AsyncClient, auth_headers, admin_user, agent_user, tenant
+):
+    set_tenant_id(tenant.id)
+    # Página 1: solo 1 ítem
+    resp = await client.get("/api/v1/admin/users?skip=0&limit=1", headers=auth_headers)
+    assert resp.status_code == 200
+    body = resp.json()
+    assert len(body["items"]) <= 1
+    assert body["total"] >= 1
+
+    # Página 2: skip=1
+    resp2 = await client.get("/api/v1/admin/users?skip=1&limit=1", headers=auth_headers)
+    assert resp2.status_code == 200
+    body2 = resp2.json()
+    assert body2["skip"] == 1
+
+
+@pytest.mark.asyncio
+async def test_paginacion_canales(
+    client: AsyncClient, auth_headers, tenant
+):
+    set_tenant_id(tenant.id)
+    resp = await client.get("/api/v1/channels?skip=0&limit=1", headers=auth_headers)
+    assert resp.status_code == 200
+    body = resp.json()
+    assert "items" in body
+    assert "total" in body
+    assert "skip" in body
+    assert "limit" in body
+    assert len(body["items"]) <= 1

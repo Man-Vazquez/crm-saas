@@ -190,3 +190,90 @@ async def test_listar_mensajes_de_ticket(
 async def test_ticket_sin_auth_devuelve_401(client: AsyncClient, tenant):
     resp = await client.get("/api/v1/tickets")
     assert resp.status_code == 401
+
+
+@pytest.mark.asyncio
+async def test_actualizar_estado_ticket(
+    client: AsyncClient, auth_headers, admin_user, customer, default_status, tenant
+):
+    set_tenant_id(tenant.id)
+    # Crear un segundo estado para poder cambiar a él
+    nuevo_status = await client.post("/api/v1/tickets/statuses", headers=auth_headers, json={
+        "name": "En progreso",
+        "color": "#3B82F6",
+        "sort_order": 1,
+        "is_default": False,
+    })
+    nuevo_status_id = nuevo_status.json()["id"]
+
+    created = await client.post("/api/v1/tickets", headers=auth_headers, json={
+        "subject": "Ticket cambio estado",
+        "customer_id": str(customer.id),
+        "status_id": str(default_status.id),
+        "priority": "low",
+        "channel": "manual",
+    })
+    ticket_id = created.json()["id"]
+
+    resp = await client.patch(f"/api/v1/tickets/{ticket_id}", headers=auth_headers, json={
+        "status_id": nuevo_status_id,
+    })
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["status_id"] == nuevo_status_id
+    assert body["updated_by"] == str(admin_user.id)
+    assert body["last_activity"] is not None
+    assert "Estado" in body["last_activity"]
+
+
+@pytest.mark.asyncio
+async def test_actualizar_agente_ticket(
+    client: AsyncClient, auth_headers, admin_user, agent_user, customer, default_status, tenant
+):
+    set_tenant_id(tenant.id)
+    created = await client.post("/api/v1/tickets", headers=auth_headers, json={
+        "subject": "Ticket asignación agente",
+        "customer_id": str(customer.id),
+        "status_id": str(default_status.id),
+        "priority": "medium",
+        "channel": "manual",
+    })
+    ticket_id = created.json()["id"]
+
+    resp = await client.patch(f"/api/v1/tickets/{ticket_id}", headers=auth_headers, json={
+        "assigned_to": str(agent_user.id),
+    })
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["assigned_to"] == str(agent_user.id)
+    assert body["updated_by"] == str(admin_user.id)
+    assert body["last_activity"] is not None
+    assert "asignado" in body["last_activity"].lower()
+
+
+@pytest.mark.asyncio
+async def test_reply_actualiza_actividad(
+    client: AsyncClient, auth_headers, admin_user, customer, default_status, tenant
+):
+    set_tenant_id(tenant.id)
+    created = await client.post("/api/v1/tickets", headers=auth_headers, json={
+        "subject": "Ticket para reply",
+        "customer_id": str(customer.id),
+        "status_id": str(default_status.id),
+        "priority": "low",
+        "channel": "manual",
+    })
+    ticket_id = created.json()["id"]
+
+    resp = await client.post(
+        f"/api/v1/tickets/{ticket_id}/messages",
+        headers=auth_headers,
+        json={"body": "Respuesta de prueba", "msg_type": "reply"},
+    )
+    assert resp.status_code == 201
+
+    ticket_resp = await client.get(f"/api/v1/tickets/{ticket_id}", headers=auth_headers)
+    assert ticket_resp.status_code == 200
+    body = ticket_resp.json()
+    assert body["last_activity"] == "Respuesta enviada"
+    assert body["updated_by"] == str(admin_user.id)
