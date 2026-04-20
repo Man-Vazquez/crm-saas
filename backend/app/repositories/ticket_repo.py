@@ -4,6 +4,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.repositories.base import BaseRepository
 from app.models.ticket import Ticket
 from app.models.ticket_config import TicketType, TicketSubtype, TicketStatus
+from app.models.ticket_counter import TicketCounter
 from app.models.message import Message
 from app.schemas.ticket import (
     TicketCreate, TicketUpdate,
@@ -81,9 +82,32 @@ class TicketRepository(BaseRepository):
 
     # --- Tickets ---
 
+    async def _next_ticket_number(self, db: AsyncSession) -> int:
+        """
+        Returns the next ticket number for this tenant using SELECT FOR UPDATE
+        to prevent duplicates under concurrent requests.
+        All within the same transaction as the ticket insert.
+        """
+        result = await db.execute(
+            select(TicketCounter)
+            .where(TicketCounter.tenant_id == self.tenant_id)
+            .with_for_update()
+        )
+        counter = result.scalar_one_or_none()
+        if counter is None:
+            counter = TicketCounter(tenant_id=self.tenant_id, last_number=1)
+            db.add(counter)
+            await db.flush()
+            return 1
+        counter.last_number += 1
+        await db.flush()
+        return counter.last_number
+
     async def create(self, db: AsyncSession, data: TicketCreate) -> Ticket:
+        ticket_number = await self._next_ticket_number(db)
         ticket = Ticket(
             tenant_id=self.tenant_id,
+            ticket_number=ticket_number,
             **data.model_dump()
         )
         db.add(ticket)

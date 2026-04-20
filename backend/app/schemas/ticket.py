@@ -94,6 +94,7 @@ class TicketResponse(BaseModel):
     priority: str
     is_active: bool
     resolved_at: datetime | None
+    ticket_number: int | None
     updated_by: uuid.UUID | None
     last_activity: str | None
     created_at: datetime

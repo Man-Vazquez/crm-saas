@@ -153,13 +153,18 @@ export default function TicketDetail() {
         onClick={() => navigate('/tickets')}
         className="text-sm text-gray-500 hover:text-gray-700 mb-4 flex items-center gap-1"
       >
-        ← Tickets
+        ← Tickets{ticket.ticket_number != null && ` / #${ticket.ticket_number}`}
       </button>
 
       {/* Header */}
       <div className="flex items-start justify-between mb-6">
         <div>
-          <h1 className="text-xl font-semibold text-gray-900">{ticket.subject}</h1>
+          <h1 className="text-xl font-semibold text-gray-900">
+            {ticket.ticket_number != null && (
+              <span className="text-gray-400 font-normal mr-1">#{ticket.ticket_number} ·</span>
+            )}
+            {ticket.subject}
+          </h1>
           <div className="flex items-center gap-2 mt-2">
             <span
               className="px-2 py-1 rounded-full text-xs font-medium"

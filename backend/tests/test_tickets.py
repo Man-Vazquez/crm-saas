@@ -252,6 +252,56 @@ async def test_actualizar_agente_ticket(
 
 
 @pytest.mark.asyncio
+async def test_ticket_number_autoincremental(
+    client: AsyncClient, auth_headers, customer, default_status, tenant
+):
+    set_tenant_id(tenant.id)
+    r1 = await client.post("/api/v1/tickets", headers=auth_headers, json={
+        "subject": "Primer ticket",
+        "customer_id": str(customer.id),
+        "status_id": str(default_status.id),
+        "priority": "low",
+        "channel": "manual",
+    })
+    r2 = await client.post("/api/v1/tickets", headers=auth_headers, json={
+        "subject": "Segundo ticket",
+        "customer_id": str(customer.id),
+        "status_id": str(default_status.id),
+        "priority": "low",
+        "channel": "manual",
+    })
+    assert r1.status_code == 201
+    assert r2.status_code == 201
+    n1 = r1.json()["ticket_number"]
+    n2 = r2.json()["ticket_number"]
+    assert n1 is not None
+    assert n2 == n1 + 1
+
+
+@pytest.mark.asyncio
+async def test_ticket_number_no_duplicado(
+    client: AsyncClient, auth_headers, customer, default_status, tenant
+):
+    set_tenant_id(tenant.id)
+    numbers = []
+    for i in range(5):
+        r = await client.post("/api/v1/tickets", headers=auth_headers, json={
+            "subject": f"Ticket secuencial {i + 1}",
+            "customer_id": str(customer.id),
+            "status_id": str(default_status.id),
+            "priority": "low",
+            "channel": "manual",
+        })
+        assert r.status_code == 201
+        numbers.append(r.json()["ticket_number"])
+
+    # Todos únicos
+    assert len(set(numbers)) == 5
+    # Todos consecutivos
+    assert numbers == list(range(numbers[0], numbers[0] + 5))
+
+
+@pytest.mark.asyncio
 async def test_reply_actualiza_actividad(
     client: AsyncClient, auth_headers, admin_user, customer, default_status, tenant
 ):

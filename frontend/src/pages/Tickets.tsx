@@ -209,7 +209,12 @@ export default function Tickets() {
                     onClick={() => navigate(`/tickets/${ticket.id}`)}
                     className="border-b border-gray-100 hover:bg-gray-50 cursor-pointer transition-colors last:border-0"
                   >
-                    <td className="px-4 py-3 font-medium text-gray-900">{ticket.subject}</td>
+                    <td className="px-4 py-3 font-medium text-gray-900">
+                      {ticket.ticket_number != null && (
+                        <span className="text-gray-400 font-normal mr-1">#{ticket.ticket_number} ·</span>
+                      )}
+                      {ticket.subject}
+                    </td>
                     <td className="px-4 py-3">
                       <span
                         className="px-2 py-1 rounded-full text-xs font-medium"

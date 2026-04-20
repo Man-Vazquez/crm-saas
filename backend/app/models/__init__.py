@@ -8,8 +8,9 @@ from app.models.customer import Customer
 from app.models.ticket_config import TicketType, TicketSubtype, TicketStatus
 from app.models.ticket import Ticket
 from app.models.message import Message
-from app.models.channel import Channel  
+from app.models.channel import Channel
 from app.models.agent_channel import AgentChannel
+from app.models.ticket_counter import TicketCounter
 
 # En fases futuras iremos agregando:
 # from app.models.ticket import Ticket              # noqa: F401

@@ -1,5 +1,5 @@
 import uuid
-from sqlalchemy import String, Boolean, ForeignKey, Text, TIMESTAMP, text as sa_text
+from sqlalchemy import String, Boolean, ForeignKey, Text, TIMESTAMP, Integer, text as sa_text
 from sqlalchemy.orm import Mapped, mapped_column
 from sqlalchemy.dialects.postgresql import UUID
 from datetime import datetime, timezone
@@ -40,6 +40,7 @@ class Ticket(Base):
     priority: Mapped[str] = mapped_column(String(20), nullable=False, default="medium")
     is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
     resolved_at: Mapped[datetime | None] = mapped_column(TIMESTAMP(timezone=True), nullable=True)
+    ticket_number: Mapped[int | None] = mapped_column(Integer, nullable=True)
     updated_by: Mapped[uuid.UUID | None] = mapped_column(
         UUID(as_uuid=True), ForeignKey("users.id"), nullable=True
     )

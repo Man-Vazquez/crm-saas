@@ -9,6 +9,7 @@ import type { components } from './api'
 // ── Core domain types ────────────────────────────────────────────────────────
 
 export type Ticket        = components['schemas']['TicketResponse'] & {
+  ticket_number: number | null
   updated_by: string | null
   last_activity: string | null
 }
