@@ -3,7 +3,9 @@ import asyncio
 import email as email_lib
 import imaplib
 import logging
+import re
 import smtplib
+from email.header import decode_header, make_header
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 
@@ -91,19 +93,46 @@ class EmailChannel(BaseChannel):
 
         return messages
 
+    def _decode_subject(self, raw: str) -> str:
+        """Decode an RFC 2047 encoded subject (=?UTF-8?Q?...?= / =?ISO-8859-1?B?...?=)."""
+        try:
+            return str(make_header(decode_header(raw)))
+        except Exception:
+            return raw
+
+    def _strip_html(self, html: str) -> str:
+        """Minimal HTML-to-text fallback when no text/plain part exists."""
+        text = re.sub(r'<[^>]+>', '', html)
+        text = re.sub(r'&nbsp;', ' ', text)
+        text = re.sub(r'&amp;', '&', text)
+        text = re.sub(r'&lt;', '<', text)
+        text = re.sub(r'&gt;', '>', text)
+        text = re.sub(r'&quot;', '"', text)
+        return re.sub(r'\n{3,}', '\n\n', text).strip()
+
     def _parse_email_object(self, parsed_email) -> InboundMessage | None:
         try:
-            from_raw = parsed_email.get("From", "")
-            to_raw   = parsed_email.get("To", "")
-            subject  = parsed_email.get("Subject", "")
-            msg_id   = parsed_email.get("Message-ID", from_raw)
+            from_raw    = parsed_email.get("From", "")
+            to_raw      = parsed_email.get("To", "")
+            subject_raw = parsed_email.get("Subject", "")
+            subject     = self._decode_subject(subject_raw)   # Bug 1 fix: RFC 2047 decoding
+            msg_id      = parsed_email.get("Message-ID", from_raw)
 
-            body = ""
+            # Bug 2 fix: explicit two-pass extraction — prefer text/plain, fall back to
+            # text/html with tag stripping.  The previous single-pass loop broke on emails
+            # where text/html appeared before text/plain in the MIME tree.
+            plain_body = ""
+            html_body  = ""
             if parsed_email.is_multipart():
                 for part in parsed_email.walk():
-                    if part.get_content_type() == "text/plain":
-                        body = part.get_payload(decode=True).decode("utf-8", errors="replace")
-                        break
+                    ct = part.get_content_type()
+                    if ct == "text/plain" and not plain_body:
+                        plain_body = part.get_payload(decode=True).decode("utf-8", errors="replace")
+                    elif ct == "text/html" and not html_body:
+                        html_body = part.get_payload(decode=True).decode("utf-8", errors="replace")
+                # Prefer HTML so the frontend can render rich email content.
+                # Fall back to plain text for plain-text-only emails.
+                body = html_body or plain_body
             else:
                 body = parsed_email.get_payload(decode=True).decode("utf-8", errors="replace")
 

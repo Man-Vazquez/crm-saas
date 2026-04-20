@@ -97,7 +97,7 @@ async def test_ticket_inexistente_devuelve_404(
 
 @pytest.mark.asyncio
 async def test_actualizar_ticket(
-    client: AsyncClient, auth_headers, customer, default_status, tenant
+    client: AsyncClient, auth_headers, admin_user, customer, default_status, tenant
 ):
     set_tenant_id(tenant.id)
     created = await client.post("/api/v1/tickets", headers=auth_headers, json={
@@ -113,7 +113,11 @@ async def test_actualizar_ticket(
         "priority": "urgent",
     })
     assert resp.status_code == 200
-    assert resp.json()["priority"] == "urgent"
+    body = resp.json()
+    assert body["priority"] == "urgent"
+    assert body["updated_by"] == str(admin_user.id)
+    assert body["last_activity"] is not None
+    assert "Prioridad" in body["last_activity"]
 
 
 @pytest.mark.asyncio

@@ -122,9 +122,9 @@ async def update_ticket(
     ticket_id: uuid.UUID,
     data: TicketUpdate,
     db: AsyncSession = Depends(get_db),
-    current_user=Depends(get_current_user),
+    current_user: User = Depends(get_current_user),
 ):
-    return await get_service().update(db, ticket_id, data)
+    return await get_service().update(db, ticket_id, data, updated_by=current_user.id)
 
 
 @router.delete("/{ticket_id}")
@@ -163,10 +163,12 @@ async def reply_to_ticket(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    service = ChannelService()
-    return await service.reply_to_ticket(
+    channel_service = ChannelService()
+    message = await channel_service.reply_to_ticket(
         db=db,
         ticket_id=ticket_id,
         agent_id=current_user.id,
         body=data.body,
     )
+    await get_service().touch_activity(db, ticket_id, current_user.id, "Respuesta enviada")
+    return message

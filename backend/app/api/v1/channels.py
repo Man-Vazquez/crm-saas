@@ -1,5 +1,5 @@
 from uuid import UUID
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
@@ -34,14 +34,22 @@ async def create_channel(
     return await repo.create(db, data.channel_type, data.name, data.config)
 
 
-@router.get("", response_model=list[ChannelResponse])
+@router.get("", response_model=dict)
 async def list_channels(
+    skip: int = Query(0, ge=0),
+    limit: int = Query(20, ge=1, le=100),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
     repo: ChannelRepository = Depends(get_repo),
 ):
     """Lista todos los canales del tenant."""
-    return await repo.get_all(db)
+    items, total = await repo.get_paginated(db, skip, limit)
+    return {
+        "items": [ChannelResponse.model_validate(c) for c in items],
+        "total": total,
+        "skip": skip,
+        "limit": limit,
+    }
 
 
 @router.get("/{channel_id}", response_model=ChannelResponse)

@@ -8,7 +8,10 @@ import type { components } from './api'
 
 // ── Core domain types ────────────────────────────────────────────────────────
 
-export type Ticket        = components['schemas']['TicketResponse']
+export type Ticket        = components['schemas']['TicketResponse'] & {
+  updated_by: string | null
+  last_activity: string | null
+}
 export type Customer      = components['schemas']['CustomerResponse']
 export type Message       = components['schemas']['MessageResponse']
 export type Channel       = components['schemas']['ChannelResponse']

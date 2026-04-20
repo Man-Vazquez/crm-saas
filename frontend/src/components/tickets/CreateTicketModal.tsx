@@ -39,7 +39,7 @@ export default function CreateTicketModal({ onClose, onCreated }: Props) {
     Promise.all([getStatuses(), getTypes(), getChannels()]).then(([s, t, c]) => {
       setStatuses(s)
       setTypes(t)
-      setChannels(c)
+      setChannels(c.items)
       const def = s.find((x) => x.is_default) ?? s[0]
       if (def) setStatusId(def.id)
     })

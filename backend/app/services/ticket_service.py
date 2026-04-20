@@ -101,11 +101,30 @@ class TicketService:
             "limit": limit,
         }
 
+    @staticmethod
+    def _activity_from_update(data: TicketUpdate) -> str:
+        changed = data.model_dump(exclude_unset=True, exclude={'updated_by'})
+        PRIORITY_ES = {'low': 'Baja', 'medium': 'Media', 'high': 'Alta', 'urgent': 'Urgente'}
+        if 'priority' in changed and changed['priority']:
+            return f"Prioridad cambiada a {PRIORITY_ES.get(changed['priority'], changed['priority'])}"
+        if 'status_id' in changed:
+            return "Estado actualizado"
+        if 'assigned_to' in changed:
+            return "Ticket asignado" if changed['assigned_to'] else "Ticket desasignado"
+        if 'type_id' in changed:
+            return "Tipo actualizado"
+        if 'subtype_id' in changed:
+            return "Subtipo actualizado"
+        if 'subject' in changed:
+            return "Asunto actualizado"
+        return "Ticket actualizado"
+
     async def update(
         self,
         db: AsyncSession,
         ticket_id: uuid.UUID,
         data: TicketUpdate,
+        updated_by: uuid.UUID | None = None,
     ) -> TicketResponse:
         ticket = await self.repo.get_by_id(db, ticket_id)
         if not ticket:
@@ -113,8 +132,20 @@ class TicketService:
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="Ticket no encontrado",
             )
-        ticket = await self.repo.update(db, ticket, data)
+        activity_desc = self._activity_from_update(data)
+        ticket = await self.repo.update(db, ticket, data, updated_by=updated_by, activity_desc=activity_desc)
         return TicketResponse.model_validate(ticket)
+
+    async def touch_activity(
+        self,
+        db: AsyncSession,
+        ticket_id: uuid.UUID,
+        updated_by: uuid.UUID,
+        activity_desc: str,
+    ) -> None:
+        ticket = await self.repo.get_by_id(db, ticket_id)
+        if ticket:
+            await self.repo.touch_activity(db, ticket, updated_by, activity_desc)
 
     async def delete(self, db: AsyncSession, ticket_id: uuid.UUID) -> dict:
         ticket = await self.repo.get_by_id(db, ticket_id)
@@ -142,6 +173,8 @@ class TicketService:
                 detail="Ticket no encontrado",
             )
         message = await self.repo.create_message(db, ticket_id, author_id, data)
+        activity_desc = "Respuesta enviada" if data.msg_type == "reply" else "Nota interna agregada"
+        await self.repo.touch_activity(db, ticket, author_id, activity_desc)
         return MessageResponse.model_validate(message)
 
     async def get_messages(

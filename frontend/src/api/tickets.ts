@@ -1,5 +1,5 @@
 import client from './client'
-import type { Ticket, TicketStatus, TicketType, Message, PaginatedResponse } from '../types'
+import type { Ticket, TicketStatus, TicketType, TicketSubtype, Message, PaginatedResponse } from '../types'
 
 export const getTickets = async (params?: {
   skip?: number
@@ -44,6 +44,11 @@ export const getStatuses = async () => {
 
 export const getTypes = async () => {
   const { data } = await client.get<TicketType[]>('/tickets/types')
+  return data
+}
+
+export const getSubtypes = async (typeId: string) => {
+  const { data } = await client.get<TicketSubtype[]>(`/tickets/types/${typeId}/subtypes`)
   return data
 }
 

@@ -52,6 +52,9 @@ TestingSessionLocal = async_sessionmaker(
 @pytest_asyncio.fixture(scope="session", autouse=True)
 async def setup_database():
     async with engine_test.begin() as conn:
+        # Drop all tables so schema changes (new columns, etc.) are always reflected.
+        # ENUMs are not tracked by metadata (create_type=False) so they survive.
+        await conn.run_sync(Base.metadata.drop_all)
         # Los enums con create_type=False requieren existir antes de create_all.
         # asyncpg no soporta CREATE TYPE IF NOT EXISTS — usamos DO $$ BEGIN ... EXCEPTION.
         await conn.execute(text("""

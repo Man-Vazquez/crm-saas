@@ -24,8 +24,11 @@ async def test_listar_usuarios(client: AsyncClient, auth_headers, admin_user, te
     set_tenant_id(tenant.id)
     resp = await client.get("/api/v1/admin/users", headers=auth_headers)
     assert resp.status_code == 200
-    assert isinstance(resp.json(), list)
-    assert len(resp.json()) >= 1
+    body = resp.json()
+    assert "items" in body
+    assert "total" in body
+    assert body["total"] >= 1
+    assert len(body["items"]) >= 1
 
 
 @pytest.mark.asyncio

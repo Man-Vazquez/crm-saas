@@ -1,14 +1,48 @@
 import { useEffect, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { getTicket, getMessages, createMessage, replyTicket, getStatuses } from '../api/tickets'
+import { getTicket, getMessages, createMessage, replyTicket, getStatuses, getTypes, getSubtypes, updateTicket } from '../api/tickets'
 import { getCustomer } from '../api/customers'
-import type { Ticket, Message, TicketStatus, Customer } from '../types'
+import { getAdminUsers } from '../api/admin'
+import type { Ticket, Message, TicketStatus, TicketType, TicketSubtype, Customer, AdminUser } from '../types'
 import ErrorMessage from '../components/common/ErrorMessage'
 import LoadingSpinner from '../components/common/LoadingSpinner'
 
 const PRIORITY_LABEL: Record<string, string> = {
   low: 'Baja', medium: 'Media', high: 'Alta', urgent: 'Urgente',
 }
+
+const SELECT_CLS =
+  'text-xs border border-gray-200 rounded px-1.5 py-0.5 bg-white text-gray-900 ' +
+  'focus:outline-none focus:ring-1 focus:ring-blue-400 disabled:opacity-40 max-w-[140px]'
+
+function FieldRow({
+  label,
+  status,
+  children,
+}: {
+  label: string
+  status: 'saving' | 'saved' | 'error' | undefined
+  children: React.ReactNode
+}) {
+  return (
+    <div className="flex justify-between items-start gap-2">
+      <span className="text-gray-500 shrink-0 pt-0.5">{label}</span>
+      <div className="flex flex-col items-end gap-0.5">
+        {children}
+        {status === 'saving' && <span className="text-[10px] text-gray-400">Guardando…</span>}
+        {status === 'saved'  && <span className="text-[10px] text-green-600">Guardado</span>}
+        {status === 'error'  && <span className="text-[10px] text-red-500">Error al guardar</span>}
+      </div>
+    </div>
+  )
+}
+
+const PRIORITY_OPTIONS = [
+  { value: 'low',    label: 'Baja' },
+  { value: 'medium', label: 'Media' },
+  { value: 'high',   label: 'Alta' },
+  { value: 'urgent', label: 'Urgente' },
+]
 
 export default function TicketDetail() {
   const { id } = useParams<{ id: string }>()
@@ -17,12 +51,23 @@ export default function TicketDetail() {
   const [ticket, setTicket] = useState<Ticket | null>(null)
   const [messages, setMessages] = useState<Message[]>([])
   const [statuses, setStatuses] = useState<TicketStatus[]>([])
+  const [types, setTypes] = useState<TicketType[]>([])
+  const [subtypes, setSubtypes] = useState<TicketSubtype[]>([])
+  const [users, setUsers] = useState<AdminUser[]>([])
   const [customer, setCustomer] = useState<Customer | null>(null)
   const [body, setBody] = useState('')
   const [msgType, setMsgType] = useState<'reply' | 'comment'>('reply')
   const [sending, setSending] = useState(false)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [fieldStatus, setFieldStatus] = useState<Record<string, 'saving' | 'saved' | 'error'>>({})
+
+  const clearFieldStatus = (field: string) =>
+    setFieldStatus(prev => { const n = { ...prev }; delete n[field]; return n })
+
+  const loadSubtypes = (typeId: string) => {
+    getSubtypes(typeId).then(setSubtypes).catch(() => setSubtypes([]))
+  }
 
   const loadData = () => {
     if (!id) return
@@ -32,14 +77,42 @@ export default function TicketDetail() {
       getTicket(id),
       getMessages(id),
       getStatuses(),
-    ]).then(([t, m, s]) => {
+      getTypes(),
+      getAdminUsers(0, 100),
+    ]).then(([t, m, s, ty, u]) => {
       setTicket(t)
       setMessages(m)
       setStatuses(s)
+      setTypes(ty)
+      setUsers(u.items)
+      if (t.type_id) loadSubtypes(t.type_id)
       return getCustomer(t.customer_id)
     }).then(setCustomer)
       .catch(() => setError('No se pudieron cargar los datos del ticket. Verifica tu conexión.'))
       .finally(() => setLoading(false))
+  }
+
+  const handleFieldChange = async (field: string, value: string | null) => {
+    if (!id || !ticket) return
+    setFieldStatus(prev => ({ ...prev, [field]: 'saving' }))
+    try {
+      // Changing type resets subtype in the same PATCH to avoid stale subtypes
+      const patch = (field === 'type_id'
+        ? { type_id: value || null, subtype_id: null }
+        : { [field]: value || null }
+      ) as Partial<Ticket>
+      const updated = await updateTicket(id, patch)
+      setTicket(updated)
+      if (field === 'type_id') {
+        setSubtypes([])
+        if (value) loadSubtypes(value)
+      }
+      setFieldStatus(prev => ({ ...prev, [field]: 'saved' }))
+      setTimeout(() => clearFieldStatus(field), 2000)
+    } catch {
+      setFieldStatus(prev => ({ ...prev, [field]: 'error' }))
+      setTimeout(() => clearFieldStatus(field), 3000)
+    }
   }
 
   useEffect(() => {
@@ -128,7 +201,21 @@ export default function TicketDetail() {
                         {new Date(msg.created_at).toLocaleString('es-MX')}
                       </span>
                     </div>
-                    <p className="text-sm text-gray-800 whitespace-pre-wrap">{msg.body}</p>
+                    {ticket.channel === 'email' && msg.msg_type !== 'comment' ? (
+                      // Email HTML body — rendered as markup so images, formatting and
+                      // links display correctly.
+                      // TODO: sanitize with DOMPurify before dangerouslySetInnerHTML
+                      // to prevent XSS from malicious email content.
+                      <div
+                        className="text-sm text-gray-800 overflow-x-auto
+                          [&_img]:max-w-full [&_img]:h-auto
+                          [&_a]:text-blue-600 [&_a]:underline
+                          [&_p]:mb-2 [&_p:last-child]:mb-0"
+                        dangerouslySetInnerHTML={{ __html: msg.body }}
+                      />
+                    ) : (
+                      <p className="text-sm text-gray-800 whitespace-pre-wrap">{msg.body}</p>
+                    )}
                   </div>
                 ))}
               </div>
@@ -205,19 +292,93 @@ export default function TicketDetail() {
 
           <div className="bg-white border border-gray-200 rounded-lg p-4">
             <h3 className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-3">Detalles</h3>
-            <div className="flex flex-col gap-2 text-xs">
-              <div className="flex justify-between">
+            <div className="flex flex-col gap-3 text-xs">
+
+              {/* Estado */}
+              <FieldRow label="Estado" status={fieldStatus['status_id']}>
+                <select
+                  value={ticket.status_id}
+                  disabled={fieldStatus['status_id'] === 'saving'}
+                  onChange={e => handleFieldChange('status_id', e.target.value)}
+                  className={SELECT_CLS}
+                >
+                  {statuses.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+                </select>
+              </FieldRow>
+
+              {/* Prioridad */}
+              <FieldRow label="Prioridad" status={fieldStatus['priority']}>
+                <select
+                  value={ticket.priority}
+                  disabled={fieldStatus['priority'] === 'saving'}
+                  onChange={e => handleFieldChange('priority', e.target.value)}
+                  className={SELECT_CLS}
+                >
+                  {PRIORITY_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+                </select>
+              </FieldRow>
+
+              {/* Tipo */}
+              <FieldRow label="Tipo" status={fieldStatus['type_id']}>
+                <select
+                  value={ticket.type_id ?? ''}
+                  disabled={fieldStatus['type_id'] === 'saving'}
+                  onChange={e => handleFieldChange('type_id', e.target.value || null)}
+                  className={SELECT_CLS}
+                >
+                  <option value="">Sin tipo</option>
+                  {types.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
+                </select>
+              </FieldRow>
+
+              {/* Subtipo */}
+              <FieldRow label="Subtipo" status={fieldStatus['subtype_id']}>
+                <select
+                  value={ticket.subtype_id ?? ''}
+                  disabled={!ticket.type_id || fieldStatus['subtype_id'] === 'saving'}
+                  onChange={e => handleFieldChange('subtype_id', e.target.value || null)}
+                  className={SELECT_CLS}
+                >
+                  <option value="">Sin subtipo</option>
+                  {subtypes.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+                </select>
+              </FieldRow>
+
+              {/* Agente */}
+              <FieldRow label="Agente" status={fieldStatus['assigned_to']}>
+                <select
+                  value={ticket.assigned_to ?? ''}
+                  disabled={fieldStatus['assigned_to'] === 'saving'}
+                  onChange={e => handleFieldChange('assigned_to', e.target.value || null)}
+                  className={SELECT_CLS}
+                >
+                  <option value="">Sin asignar</option>
+                  {users.map(u => <option key={u.id} value={u.id}>{u.full_name}</option>)}
+                </select>
+              </FieldRow>
+
+              {/* Canal, fechas y actividad — solo lectura */}
+              <div className="flex justify-between pt-1 border-t border-gray-100">
                 <span className="text-gray-500">Canal</span>
                 <span className="text-gray-900 capitalize">{ticket.channel}</span>
               </div>
               <div className="flex justify-between">
-                <span className="text-gray-500">Prioridad</span>
-                <span className="text-gray-900">{PRIORITY_LABEL[ticket.priority]}</span>
+                <span className="text-gray-500">Creado</span>
+                <span className="text-gray-900">{new Date(ticket.created_at).toLocaleString('es-MX')}</span>
               </div>
               <div className="flex justify-between">
-                <span className="text-gray-500">Creado</span>
-                <span className="text-gray-900">{new Date(ticket.created_at).toLocaleDateString('es-MX')}</span>
+                <span className="text-gray-500">Actualizado</span>
+                <span className="text-gray-900">{new Date(ticket.updated_at).toLocaleString('es-MX')}</span>
               </div>
+              {ticket.updated_by && (
+                <div className="flex justify-between">
+                  <span className="text-gray-500">Por</span>
+                  <span className="text-gray-900 text-right">
+                    {users.find(u => u.id === ticket.updated_by)?.full_name ?? '—'}
+                  </span>
+                </div>
+              )}
+
             </div>
           </div>
         </div>

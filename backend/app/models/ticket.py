@@ -40,6 +40,10 @@ class Ticket(Base):
     priority: Mapped[str] = mapped_column(String(20), nullable=False, default="medium")
     is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
     resolved_at: Mapped[datetime | None] = mapped_column(TIMESTAMP(timezone=True), nullable=True)
+    updated_by: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("users.id"), nullable=True
+    )
+    last_activity: Mapped[str | None] = mapped_column(String(500), nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         TIMESTAMP(timezone=True), nullable=False, default=lambda: datetime.now(timezone.utc)
     )

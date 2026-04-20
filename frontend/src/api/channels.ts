@@ -1,10 +1,8 @@
 import client from './client'
-import type { Channel } from '../types'
+import type { Channel, PaginatedResponse } from '../types'
 
-export const getChannels = async () => {
-  const { data } = await client.get<Channel[]>('/channels')
-  return data
-}
+export const getChannels = (skip = 0, limit = 20) =>
+  client.get<PaginatedResponse<Channel>>('/channels', { params: { skip, limit } }).then(r => r.data)
 
 export const createChannel = (data: {
   channel_type: string

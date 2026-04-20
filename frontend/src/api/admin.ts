@@ -1,8 +1,8 @@
 import client from './client'
-import type { AdminUser, Tenant } from '../types'
+import type { AdminUser, PaginatedResponse, Tenant } from '../types'
 
-export const getAdminUsers = () =>
-  client.get<AdminUser[]>('/admin/users').then(r => r.data)
+export const getAdminUsers = (skip = 0, limit = 20) =>
+  client.get<PaginatedResponse<AdminUser>>('/admin/users', { params: { skip, limit } }).then(r => r.data)
 
 export const createAdminUser = (data: {
   email: string

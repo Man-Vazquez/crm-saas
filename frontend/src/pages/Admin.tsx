@@ -11,6 +11,7 @@ import { getChannels, createChannel } from '../api/channels'
 import type { AdminUser, Channel, Tenant } from '../types'
 import ErrorMessage from '../components/common/ErrorMessage'
 import LoadingSpinner from '../components/common/LoadingSpinner'
+import Pagination from '../components/common/Pagination'
 
 type Tab = 'users' | 'channels' | 'account'
 
@@ -308,6 +309,8 @@ function CreateChannelModal({ onClose, onCreated }: CreateChannelModalProps) {
 
 // ── Main page ──────────────────────────────────────────────────────────────
 
+const LIMIT = 20
+
 export default function Admin() {
   const [activeTab, setActiveTab] = useState<Tab>('users')
 
@@ -317,12 +320,16 @@ export default function Admin() {
   const [usersError, setUsersError] = useState<string | null>(null)
   const [showCreateUser, setShowCreateUser] = useState(false)
   const [editingUser, setEditingUser] = useState<AdminUser | null>(null)
+  const [userPage, setUserPage] = useState(1)
+  const [userTotal, setUserTotal] = useState(0)
 
   // Channels
   const [channels, setChannels] = useState<Channel[]>([])
   const [channelsLoading, setChannelsLoading] = useState(false)
   const [channelsError, setChannelsError] = useState<string | null>(null)
   const [showCreateChannel, setShowCreateChannel] = useState(false)
+  const [channelPage, setChannelPage] = useState(1)
+  const [channelTotal, setChannelTotal] = useState(0)
 
   // Account
   const [tenant, setTenant] = useState<Tenant | null>(null)
@@ -332,20 +339,20 @@ export default function Admin() {
   const [savingTenant, setSavingTenant] = useState(false)
   const [tenantSaved, setTenantSaved] = useState(false)
 
-  const loadUsers = () => {
+  const loadUsers = (page = 1) => {
     setUsersLoading(true)
     setUsersError(null)
-    getAdminUsers()
-      .then(setUsers)
+    getAdminUsers((page - 1) * LIMIT, LIMIT)
+      .then(({ items, total }) => { setUsers(items); setUserTotal(total) })
       .catch(() => setUsersError('No se pudieron cargar los usuarios. Verifica tu conexión.'))
       .finally(() => setUsersLoading(false))
   }
 
-  const loadChannels = () => {
+  const loadChannels = (page = 1) => {
     setChannelsLoading(true)
     setChannelsError(null)
-    getChannels()
-      .then(setChannels)
+    getChannels((page - 1) * LIMIT, LIMIT)
+      .then(({ items, total }) => { setChannels(items); setChannelTotal(total) })
       .catch(() => setChannelsError('No se pudieron cargar los canales. Verifica tu conexión.'))
       .finally(() => setChannelsLoading(false))
   }
@@ -363,15 +370,22 @@ export default function Admin() {
   }
 
   useEffect(() => {
-    if (activeTab === 'users' && users.length === 0) loadUsers()
-    if (activeTab === 'channels' && channels.length === 0) loadChannels()
+    if (activeTab === 'users') loadUsers(userPage)
+  }, [activeTab, userPage])
+
+  useEffect(() => {
+    if (activeTab === 'channels') loadChannels(channelPage)
+  }, [activeTab, channelPage])
+
+  useEffect(() => {
     if (activeTab === 'account' && !tenant) loadTenant()
   }, [activeTab])
 
   const handleDeactivate = async (user: AdminUser) => {
     if (!confirm(`¿Desactivar al usuario ${user.full_name}?`)) return
     await deleteAdminUser(user.id)
-    loadUsers()
+    setUserPage(1)
+    loadUsers(1)
   }
 
   const handleSaveTenant = async (e: React.FormEvent) => {
@@ -479,17 +493,18 @@ export default function Admin() {
               </table>
             )}
           </div>
+          <Pagination total={userTotal} page={userPage} limit={LIMIT} onChange={setUserPage} />
           {showCreateUser && (
             <CreateUserModal
               onClose={() => setShowCreateUser(false)}
-              onCreated={() => { setShowCreateUser(false); loadUsers() }}
+              onCreated={() => { setShowCreateUser(false); setUserPage(1); loadUsers(1) }}
             />
           )}
           {editingUser && (
             <EditUserModal
               user={editingUser}
               onClose={() => setEditingUser(null)}
-              onSaved={() => { setEditingUser(null); loadUsers() }}
+              onSaved={() => { setEditingUser(null); loadUsers(userPage) }}
             />
           )}
         </>
@@ -539,10 +554,11 @@ export default function Admin() {
               </table>
             )}
           </div>
+          <Pagination total={channelTotal} page={channelPage} limit={LIMIT} onChange={setChannelPage} />
           {showCreateChannel && (
             <CreateChannelModal
               onClose={() => setShowCreateChannel(false)}
-              onCreated={() => { setShowCreateChannel(false); loadChannels() }}
+              onCreated={() => { setShowCreateChannel(false); setChannelPage(1); loadChannels(1) }}
             />
           )}
         </>

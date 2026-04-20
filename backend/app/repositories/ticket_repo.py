@@ -139,12 +139,31 @@ class TicketRepository(BaseRepository):
         db: AsyncSession,
         ticket: Ticket,
         data: TicketUpdate,
+        updated_by: uuid.UUID | None = None,
+        activity_desc: str | None = None,
     ) -> Ticket:
-        for field, value in data.model_dump(exclude_unset=True).items():
+        # Exclude updated_by — it is always set server-side, never from the client payload
+        for field, value in data.model_dump(exclude_unset=True, exclude={'updated_by'}).items():
             setattr(ticket, field, value)
+        if updated_by is not None:
+            ticket.updated_by = updated_by
+        if activity_desc is not None:
+            ticket.last_activity = activity_desc
         await db.flush()
         await db.refresh(ticket)
         return ticket
+
+    async def touch_activity(
+        self,
+        db: AsyncSession,
+        ticket: Ticket,
+        updated_by: uuid.UUID,
+        activity_desc: str,
+    ) -> None:
+        """Update activity tracking fields without changing ticket business data."""
+        ticket.updated_by = updated_by
+        ticket.last_activity = activity_desc
+        await db.flush()
 
     async def delete(self, db: AsyncSession, ticket: Ticket) -> Ticket:
         ticket.is_active = False

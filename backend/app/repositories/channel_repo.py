@@ -1,6 +1,6 @@
 from uuid import UUID
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, and_
+from sqlalchemy import func, select, and_
 from app.models.channel import Channel
 from app.models.agent_channel import AgentChannel
 from app.core.encryption import encrypt_config, decrypt_config
@@ -32,6 +32,21 @@ class ChannelRepository:
             select(Channel).where(Channel.tenant_id == self.tenant_id)
         )
         return result.scalars().all()
+
+    async def get_paginated(
+        self, db: AsyncSession, skip: int, limit: int
+    ) -> tuple[list[Channel], int]:
+        total = (await db.execute(
+            select(func.count(Channel.id)).where(Channel.tenant_id == self.tenant_id)
+        )).scalar_one()
+        items = (await db.execute(
+            select(Channel)
+            .where(Channel.tenant_id == self.tenant_id)
+            .order_by(Channel.created_at.desc())
+            .offset(skip)
+            .limit(limit)
+        )).scalars().all()
+        return items, total
 
     async def get_by_id(self, db: AsyncSession, channel_id: UUID) -> Channel | None:
         result = await db.execute(

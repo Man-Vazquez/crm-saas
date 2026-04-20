@@ -1,8 +1,8 @@
 from uuid import UUID
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from pydantic import BaseModel, EmailStr
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select
+from sqlalchemy import func, select
 
 from app.core.database import get_db
 from app.core.middleware import get_current_user
@@ -69,17 +69,30 @@ class TenantUpdate(BaseModel):
 
 # ── User endpoints ────────────────────────────────────────────────────────────
 
-@router.get("/users", response_model=list[UserResponse])
+@router.get("/users", response_model=dict)
 async def list_users(
+    skip: int = Query(0, ge=0),
+    limit: int = Query(20, ge=1, le=100),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_admin),
 ):
-    result = await db.execute(
+    tenant_id = get_tenant_id()
+    total = (await db.execute(
+        select(func.count(User.id)).where(User.tenant_id == tenant_id)
+    )).scalar_one()
+    items = (await db.execute(
         select(User)
-        .where(User.tenant_id == get_tenant_id())
+        .where(User.tenant_id == tenant_id)
         .order_by(User.full_name)
-    )
-    return result.scalars().all()
+        .offset(skip)
+        .limit(limit)
+    )).scalars().all()
+    return {
+        "items": [UserResponse.model_validate(u) for u in items],
+        "total": total,
+        "skip": skip,
+        "limit": limit,
+    }
 
 
 @router.post("/users", response_model=UserResponse, status_code=201)
