@@ -1,5 +1,7 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
+from slowapi.errors import RateLimitExceeded
 
 from app.core.config import settings
 from app.core.middleware import TenantMiddleware
@@ -11,6 +13,21 @@ app = FastAPI(
     docs_url="/docs" if not settings.is_production else None,
     redoc_url="/redoc" if not settings.is_production else None,
 )
+
+# Rate limiting — el limiter vive en auth.py para evitar imports circulares.
+# app.state.limiter es el punto de entrada que slowapi busca en cada request.
+app.state.limiter = auth.limiter
+
+
+async def _rate_limit_handler(request: Request, exc: RateLimitExceeded) -> JSONResponse:
+    """Devuelve JSON consistente con el resto de los errores de la API."""
+    return JSONResponse(
+        status_code=429,
+        content={"detail": f"Demasiadas solicitudes. Límite: {exc.detail}. Intenta de nuevo en un momento."},
+    )
+
+
+app.add_exception_handler(RateLimitExceeded, _rate_limit_handler)
 
 app.add_middleware(
     CORSMiddleware,

@@ -2,8 +2,10 @@
 Tests para /api/v1/tickets — CRUD de tickets, estados, tipos y mensajes.
 """
 
+import re
 import pytest
 from httpx import AsyncClient
+
 from app.core.tenant import set_tenant_id
 
 
@@ -327,3 +329,73 @@ async def test_reply_actualiza_actividad(
     body = ticket_resp.json()
     assert body["last_activity"] == "Respuesta enviada"
     assert body["updated_by"] == str(admin_user.id)
+
+
+@pytest.mark.asyncio
+async def test_deduplicacion_mensaje_externo(tenant, default_status, monkeypatch):
+    """
+    Llama a _process_email dos veces con el mismo external_id (Message-ID).
+    Solo debe crearse 1 mensaje — el segundo intento es ignorado silenciosamente.
+
+    Diseño: el test crea su propio engine NullPool (igual que conftest) para
+    el setup del canal y la assertion final. No reutiliza db_session porque
+    _process_email crea un engine con pool por defecto, y asyncpg conflicta
+    si hay múltiples pools mezclados en el mismo event loop de test.
+    """
+    from app.workers.tasks import _process_email
+    from app.models.message import Message
+    from app.models.channel import Channel
+    from app.core.config import settings as app_settings
+    from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
+    from sqlalchemy.orm import sessionmaker
+    from sqlalchemy.pool import NullPool
+    from sqlalchemy import select
+
+    # Redirigir settings.DATABASE_URL a crm_test — _process_email lee esta variable
+    # al construir su propio engine, así que el patch debe hacerse antes de llamarlo.
+    test_url = re.sub(r"/([^/?]+)(\?.*)?$", r"/crm_test\2", app_settings.DATABASE_URL)
+    monkeypatch.setattr(app_settings, "DATABASE_URL", test_url)
+
+    # Engine propio con NullPool para el setup y la assertion.
+    test_engine = create_async_engine(test_url, poolclass=NullPool)
+    TestSession = sessionmaker(test_engine, class_=AsyncSession, expire_on_commit=False)
+
+    # Crear un canal de email real — Ticket.channel_id tiene FK a channels.
+    channel_id = None
+    async with TestSession() as session:
+        async with session.begin():
+            channel = Channel(
+                tenant_id=tenant.id,
+                channel_type="email",
+                name="Canal email test dedup",
+                config={},
+                is_active=True,
+            )
+            session.add(channel)
+            await session.flush()
+            channel_id = channel.id
+
+    payload = {
+        "from": "remitente@externo.com",
+        "subject": "Email de prueba deduplicacion",
+        "message_id": "<dedup-001@mail.test>",
+        "body": "Cuerpo del email de prueba.",
+    }
+
+    # Primera llamada — crea customer, ticket y 1 mensaje.
+    await _process_email(payload, str(channel_id), str(tenant.id))
+
+    # Segunda llamada — mismo message_id, debe ser ignorada silenciosamente.
+    await _process_email(payload, str(channel_id), str(tenant.id))
+
+    # Verificar que existe exactamente 1 mensaje para este tenant.
+    async with TestSession() as session:
+        result = await session.execute(
+            select(Message).where(Message.tenant_id == tenant.id)
+        )
+        messages = result.scalars().all()
+
+    await test_engine.dispose()
+
+    assert len(messages) == 1
+    assert messages[0].external_id == "<dedup-001@mail.test>"

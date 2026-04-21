@@ -1,9 +1,11 @@
 # backend/app/api/v1/auth.py
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Request
 from sqlalchemy.ext.asyncio import AsyncSession
-from uuid import UUID
+from slowapi import Limiter
+from slowapi.util import get_remote_address
 
+from app.core.config import settings
 from app.core.database import get_db
 from app.core.security import decode_token
 from app.core.middleware import get_current_user
@@ -16,13 +18,30 @@ from app.schemas.auth import (
 from app.services.auth_service import AuthService
 from app.models.user import User
 
+# Limiter definido aquí para que main.py pueda importarlo sin circular imports.
+# storage_uri apunta a Redis para que los contadores sean compartidos entre workers.
+# swallow_errors=True: si Redis no está disponible, los errores se absorben y la
+# solicitud pasa (la app sigue funcionando sin rate limiting como fallback).
+limiter = Limiter(
+    key_func=get_remote_address,
+    storage_uri=settings.REDIS_URL,
+    swallow_errors=True,
+)
+
 router = APIRouter(prefix="/auth", tags=["auth"])
+
+
+def _exempt_in_development() -> bool:
+    """Excluye el rate limiting en desarrollo para no afectar tests ni CI."""
+    return settings.ENVIRONMENT == "development"
 
 
 # ── Endpoints ─────────────────────────────────────────────────────────
 
 @router.post("/login", response_model=TokenResponse)
+@limiter.limit("5/minute", exempt_when=_exempt_in_development)
 async def login(
+    request: Request,
     body: LoginRequest,
     db: AsyncSession = Depends(get_db),
 ):
@@ -32,7 +51,9 @@ async def login(
 
 
 @router.post("/refresh", response_model=TokenResponse)
+@limiter.limit("20/minute", exempt_when=_exempt_in_development)
 async def refresh(
+    request: Request,
     body: RefreshRequest,
     db: AsyncSession = Depends(get_db),
 ):

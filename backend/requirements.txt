@@ -27,6 +27,10 @@ httpx==0.27.2
 celery==5.4.0
 redis==5.1.1
 
+# ── Rate limiting ─────────────────────────────────────────────────────
+slowapi==0.1.9            # rate limiting para FastAPI (wraper sobre limits)
+limits==3.7.0             # motor de rate limiting con backends Redis/memoria
+
 # ── Utilidades ────────────────────────────────────────────────────────
 python-multipart==0.0.12  # necesario para recibir form data en FastAPI
 

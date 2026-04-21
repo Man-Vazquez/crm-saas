@@ -12,6 +12,7 @@
   },
   "dependencies": {
     "axios": "^1.15.0",
+    "dompurify": "^3.4.0",
     "react": "^19.2.4",
     "react-dom": "^19.2.4",
     "react-is": "^19.2.5",
@@ -22,6 +23,7 @@
   "devDependencies": {
     "@eslint/js": "^9.39.4",
     "@tailwindcss/vite": "^4.2.2",
+    "@types/dompurify": "^3.0.5",
     "@types/node": "^24.12.2",
     "@types/react": "^19.2.14",
     "@types/react-dom": "^19.2.3",

@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import DOMPurify from 'dompurify'
 import { useParams, useNavigate } from 'react-router-dom'
 import { getTicket, getMessages, createMessage, replyTicket, getStatuses, getTypes, getSubtypes, updateTicket } from '../api/tickets'
 import { getCustomer } from '../api/customers'
@@ -208,15 +209,13 @@ export default function TicketDetail() {
                     </div>
                     {ticket.channel === 'email' && msg.msg_type !== 'comment' ? (
                       // Email HTML body — rendered as markup so images, formatting and
-                      // links display correctly.
-                      // TODO: sanitize with DOMPurify before dangerouslySetInnerHTML
-                      // to prevent XSS from malicious email content.
+                      // links display correctly. Sanitized with DOMPurify to prevent XSS.
                       <div
                         className="text-sm text-gray-800 overflow-x-auto
                           [&_img]:max-w-full [&_img]:h-auto
                           [&_a]:text-blue-600 [&_a]:underline
                           [&_p]:mb-2 [&_p:last-child]:mb-0"
-                        dangerouslySetInnerHTML={{ __html: msg.body }}
+                        dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(msg.body) }}
                       />
                     ) : (
                       <p className="text-sm text-gray-800 whitespace-pre-wrap">{msg.body}</p>

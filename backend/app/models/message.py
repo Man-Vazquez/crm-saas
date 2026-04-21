@@ -24,6 +24,11 @@ class Message(Base):
     body: Mapped[str] = mapped_column(Text, nullable=False)
     direction: Mapped[str] = mapped_column(String(20), nullable=False, default="outbound")
     msg_type: Mapped[str] = mapped_column(String(20), nullable=False, default="reply")
+    # ID del mensaje en el canal de origen (Message-ID de email, msg_id de WhatsApp).
+    # Nullable: mensajes manuales y notas internas no tienen external_id.
+    # El índice parcial uq_messages_tenant_external_id garantiza unicidad por tenant
+    # solo cuando external_id IS NOT NULL (los NULL no se comparan entre sí en SQL).
+    external_id: Mapped[str | None] = mapped_column(String(500), nullable=True)
     metadata_: Mapped[dict] = mapped_column(
         "metadata", JSONB, nullable=False, default=dict
     )

@@ -179,7 +179,24 @@ async def _process_email(payload: dict, channel_id: str, tenant_id: str) -> None
                         f"Ticket creado: '{cleaned_subject}' (tenant={tenant_id})"
                     )
 
-                # ── 4. Create inbound message ───────────────────────────────
+                # ── 4. Dedup: skip si el external_id ya fue procesado ──────────────
+                # Verificación explícita antes del INSERT; el índice único parcial
+                # uq_messages_tenant_external_id es el safety net ante race conditions.
+                if message_id:
+                    result = await session.execute(
+                        select(Message).where(
+                            Message.tenant_id == tenant_uuid,
+                            Message.external_id == message_id,
+                        ).limit(1)
+                    )
+                    if result.scalar_one_or_none() is not None:
+                        logger.warning(
+                            f"Email ya procesado, ignorando duplicado | "
+                            f"external_id={message_id} | tenant={tenant_id}"
+                        )
+                        return
+
+                # ── 5. Create inbound message ───────────────────────────────
                 message = Message(
                     tenant_id=tenant_uuid,
                     ticket_id=ticket.id,
@@ -187,6 +204,7 @@ async def _process_email(payload: dict, channel_id: str, tenant_id: str) -> None
                     body=body,
                     direction="inbound",
                     msg_type="reply",
+                    external_id=message_id or None,
                     metadata_={
                         "external_id": message_id,
                         "from": from_raw,
