@@ -15,9 +15,7 @@ export type Ticket        = components['schemas']['TicketResponse'] & {
 }
 export type Customer      = components['schemas']['CustomerResponse']
 export type Message       = components['schemas']['MessageResponse']
-export type Channel       = components['schemas']['ChannelResponse'] & {
-  department_id: string | null
-}
+export type Channel       = components['schemas']['ChannelResponse']
 export type Tenant        = components['schemas']['TenantResponse']
 
 // ── Auth / users ─────────────────────────────────────────────────────────────

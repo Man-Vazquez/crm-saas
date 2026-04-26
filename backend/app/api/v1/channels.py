@@ -31,7 +31,7 @@ async def create_channel(
     """Crea un canal nuevo para el tenant. Solo admins."""
     if current_user.role.value != "admin":
         raise HTTPException(status_code=403, detail="Solo administradores pueden crear canales")
-    return await repo.create(db, data.channel_type, data.name, data.config)
+    return await repo.create(db, data.channel_type, data.name, data.config, data.department_id)
 
 
 @router.get("", response_model=dict)
@@ -78,7 +78,7 @@ async def update_channel(
     channel = await repo.get_by_id(db, channel_id)
     if not channel:
         raise HTTPException(status_code=404, detail="Canal no encontrado")
-    return await repo.update(db, channel, data.model_dump(exclude_none=True))
+    return await repo.update(db, channel, data.model_dump(exclude_unset=True))
 
 
 @router.delete("/{channel_id}", status_code=204)

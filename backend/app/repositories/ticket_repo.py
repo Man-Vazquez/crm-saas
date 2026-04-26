@@ -134,6 +134,7 @@ class TicketRepository(BaseRepository):
         assigned_to: uuid.UUID | None = None,
         customer_id: uuid.UUID | None = None,
         priority: str | None = None,
+        department_id: uuid.UUID | None = None,
     ) -> tuple[list[Ticket], int]:
         query = select(Ticket).where(
             Ticket.tenant_id == self.tenant_id,
@@ -148,6 +149,8 @@ class TicketRepository(BaseRepository):
             query = query.where(Ticket.customer_id == customer_id)
         if priority:
             query = query.where(Ticket.priority == priority)
+        if department_id:
+            query = query.where(Ticket.department_id == department_id)
 
         count_result = await db.execute(
             select(func.count()).select_from(query.subquery())

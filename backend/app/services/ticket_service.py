@@ -1,6 +1,8 @@
 import uuid
 from fastapi import HTTPException, status
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
+from app.models.department import Department
 from app.repositories.ticket_repo import TicketRepository
 from app.schemas.ticket import (
     TicketCreate, TicketUpdate, TicketResponse,
@@ -15,6 +17,31 @@ class TicketService:
 
     def __init__(self, tenant_id: uuid.UUID):
         self.repo = TicketRepository(tenant_id)
+
+    # --- Helpers ---
+
+    @staticmethod
+    async def _department_name(db: AsyncSession, department_id: uuid.UUID | None) -> str | None:
+        """Fetch department name for a single department_id. Returns None if not set."""
+        if not department_id:
+            return None
+        result = await db.execute(
+            select(Department.name).where(Department.id == department_id)
+        )
+        return result.scalar_one_or_none()
+
+    @staticmethod
+    async def _department_names_batch(
+        db: AsyncSession, tickets: list
+    ) -> dict[uuid.UUID, str]:
+        """Fetch department names for a list of tickets in a single query."""
+        dept_ids = {t.department_id for t in tickets if t.department_id}
+        if not dept_ids:
+            return {}
+        rows = (await db.execute(
+            select(Department.id, Department.name).where(Department.id.in_(dept_ids))
+        )).all()
+        return {r[0]: r[1] for r in rows}
 
     # --- Tipos ---
 
@@ -68,7 +95,10 @@ class TicketService:
                 detail="Estado de ticket inválido para este tenant",
             )
         ticket = await self.repo.create(db, data)
-        return TicketResponse.model_validate(ticket)
+        dept_name = await self._department_name(db, ticket.department_id)
+        return TicketResponse.model_validate(ticket).model_copy(
+            update={'department_name': dept_name}
+        )
 
     async def get_by_id(
         self, db: AsyncSession, ticket_id: uuid.UUID
@@ -79,7 +109,10 @@ class TicketService:
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="Ticket no encontrado",
             )
-        return TicketResponse.model_validate(ticket)
+        dept_name = await self._department_name(db, ticket.department_id)
+        return TicketResponse.model_validate(ticket).model_copy(
+            update={'department_name': dept_name}
+        )
 
     async def get_all(
         self,
@@ -90,16 +123,19 @@ class TicketService:
         assigned_to: uuid.UUID | None = None,
         customer_id: uuid.UUID | None = None,
         priority: str | None = None,
+        department_id: uuid.UUID | None = None,
     ) -> dict:
         tickets, total = await self.repo.get_all(
-            db, skip, limit, status_id, assigned_to, customer_id, priority
+            db, skip, limit, status_id, assigned_to, customer_id, priority, department_id
         )
-        return {
-            "items": [TicketResponse.model_validate(t) for t in tickets],
-            "total": total,
-            "skip": skip,
-            "limit": limit,
-        }
+        dept_names = await self._department_names_batch(db, tickets)
+        items = [
+            TicketResponse.model_validate(t).model_copy(
+                update={'department_name': dept_names.get(t.department_id)}
+            )
+            for t in tickets
+        ]
+        return {"items": items, "total": total, "skip": skip, "limit": limit}
 
     @staticmethod
     def _activity_from_update(data: TicketUpdate) -> str:
@@ -111,6 +147,8 @@ class TicketService:
             return "Estado actualizado"
         if 'assigned_to' in changed:
             return "Ticket asignado" if changed['assigned_to'] else "Ticket desasignado"
+        if 'department_id' in changed:
+            return "Departamento actualizado" if changed['department_id'] else "Departamento eliminado"
         if 'type_id' in changed:
             return "Tipo actualizado"
         if 'subtype_id' in changed:
@@ -134,7 +172,10 @@ class TicketService:
             )
         activity_desc = self._activity_from_update(data)
         ticket = await self.repo.update(db, ticket, data, updated_by=updated_by, activity_desc=activity_desc)
-        return TicketResponse.model_validate(ticket)
+        dept_name = await self._department_name(db, ticket.department_id)
+        return TicketResponse.model_validate(ticket).model_copy(
+            update={'department_name': dept_name}
+        )
 
     async def touch_activity(
         self,

@@ -13,7 +13,10 @@ class ChannelRepository:
 
     # ── Canales ────────────────────────────────────────────────────
 
-    async def create(self, db: AsyncSession, channel_type: str, name: str, config: dict) -> Channel:
+    async def create(
+        self, db: AsyncSession, channel_type: str, name: str, config: dict,
+        department_id: UUID | None = None,
+    ) -> Channel:
         # Encriptar credenciales antes de guardar
         encrypted = encrypt_config(config)
         channel = Channel(
@@ -21,6 +24,7 @@ class ChannelRepository:
             channel_type=channel_type,
             name=name,
             config=encrypted,
+            department_id=department_id,
         )
         db.add(channel)
         await db.flush()
@@ -71,11 +75,14 @@ class ChannelRepository:
         )
         return result.scalars().all()
 
+    # Fields that may legitimately be set to None (nullable FKs)
+    _NULLABLE_FIELDS = frozenset({"department_id"})
+
     async def update(self, db: AsyncSession, channel: Channel, data: dict) -> Channel:
         if "config" in data and data["config"]:
             data["config"] = encrypt_config(data["config"])
         for key, value in data.items():
-            if value is not None:
+            if value is not None or key in self._NULLABLE_FIELDS:
                 setattr(channel, key, value)
         await db.flush()
         await db.refresh(channel)

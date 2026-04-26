@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { getTickets, getStatuses } from '../api/tickets'
-import type { Ticket, TicketStatus } from '../types'
+import { getDepartments } from '../api/departments'
+import type { Ticket, TicketStatus, Department } from '../types'
 import { useAuthStore } from '../store/authStore'
 import { usePolling } from '../hooks/usePolling'
 import CreateTicketModal from '../components/tickets/CreateTicketModal'
@@ -31,11 +32,13 @@ export default function Tickets() {
 
   const [tickets, setTickets] = useState<Ticket[]>([])
   const [statuses, setStatuses] = useState<TicketStatus[]>([])
+  const [departments, setDepartments] = useState<Department[]>([])
   const [total, setTotal] = useState(0)
   const [page, setPage] = useState(1)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [statusFilter, setStatusFilter] = useState('')
+  const [departmentFilter, setDepartmentFilter] = useState('')
   const [showCreateModal, setShowCreateModal] = useState(false)
 
   // Timestamp of the last successful fetch; null until the first load completes
@@ -51,8 +54,12 @@ export default function Tickets() {
   const statusFilterRef = useRef(statusFilter)
   useEffect(() => { statusFilterRef.current = statusFilter }, [statusFilter])
 
+  const departmentFilterRef = useRef(departmentFilter)
+  useEffect(() => { departmentFilterRef.current = departmentFilter }, [departmentFilter])
+
   useEffect(() => {
     getStatuses().then(setStatuses)
+    getDepartments().then(setDepartments)
   }, [])
 
   /**
@@ -70,6 +77,7 @@ export default function Tickets() {
       skip: (currentPage - 1) * LIMIT,
       limit: LIMIT,
       status_id: statusFilterRef.current || undefined,
+      department_id: departmentFilterRef.current || undefined,
     })
       .then((res) => {
         setTickets(res.items)
@@ -88,11 +96,11 @@ export default function Tickets() {
       })
   }
 
-  // Reset to page 1 whenever the filter changes
+  // Reset to page 1 whenever a filter changes
   useEffect(() => {
     setPage(1)
     loadTickets(1)
-  }, [statusFilter])
+  }, [statusFilter, departmentFilter])
 
   // Load when page changes (skip the very first render — the filter effect handles it)
   const isFirstRender = useRef(true)
@@ -173,6 +181,18 @@ export default function Tickets() {
             <option key={s.id} value={s.id}>{s.name}</option>
           ))}
         </select>
+        {departments.length > 0 && (
+          <select
+            value={departmentFilter}
+            onChange={(e) => setDepartmentFilter(e.target.value)}
+            className="px-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+          >
+            <option value="">Todos los departamentos</option>
+            {departments.map((d) => (
+              <option key={d.id} value={d.id}>{d.name}</option>
+            ))}
+          </select>
+        )}
       </div>
 
       {error && (
@@ -198,6 +218,7 @@ export default function Tickets() {
                   <th className="text-left px-4 py-3 font-medium text-gray-600">Asunto</th>
                   <th className="text-left px-4 py-3 font-medium text-gray-600">Estado</th>
                   <th className="text-left px-4 py-3 font-medium text-gray-600">Prioridad</th>
+                  <th className="text-left px-4 py-3 font-medium text-gray-600">Departamento</th>
                   <th className="text-left px-4 py-3 font-medium text-gray-600">Canal</th>
                   <th className="text-left px-4 py-3 font-medium text-gray-600">Fecha</th>
                 </tr>
@@ -231,6 +252,7 @@ export default function Tickets() {
                         {PRIORITY_LABEL[ticket.priority]}
                       </span>
                     </td>
+                    <td className="px-4 py-3 text-gray-500">{ticket.department_name ?? '—'}</td>
                     <td className="px-4 py-3 text-gray-600 capitalize">{ticket.channel}</td>
                     <td className="px-4 py-3 text-gray-500">
                       {new Date(ticket.created_at).toLocaleDateString('es-MX')}

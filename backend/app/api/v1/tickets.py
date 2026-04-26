@@ -100,11 +100,12 @@ async def list_tickets(
     assigned_to: uuid.UUID | None = Query(None),
     customer_id: uuid.UUID | None = Query(None),
     priority: str | None = Query(None),
+    department_id: uuid.UUID | None = Query(None),
     db: AsyncSession = Depends(get_db),
     current_user=Depends(get_current_user),
 ):
     return await get_service().get_all(
-        db, skip, limit, status_id, assigned_to, customer_id, priority
+        db, skip, limit, status_id, assigned_to, customer_id, priority, department_id
     )
 
 

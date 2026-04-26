@@ -7,6 +7,7 @@ export const getTickets = async (params?: {
   status_id?: string
   priority?: string
   customer_id?: string
+  department_id?: string
 }) => {
   const { data } = await client.get<PaginatedResponse<Ticket>>('/tickets', { params })
   return data

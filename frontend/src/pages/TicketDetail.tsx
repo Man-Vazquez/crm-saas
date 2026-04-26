@@ -4,7 +4,8 @@ import { useParams, useNavigate } from 'react-router-dom'
 import { getTicket, getMessages, createMessage, replyTicket, getStatuses, getTypes, getSubtypes, updateTicket } from '../api/tickets'
 import { getCustomer } from '../api/customers'
 import { getAdminUsers } from '../api/admin'
-import type { Ticket, Message, TicketStatus, TicketType, TicketSubtype, Customer, AdminUser } from '../types'
+import { getDepartments } from '../api/departments'
+import type { Ticket, Message, TicketStatus, TicketType, TicketSubtype, Customer, AdminUser, Department } from '../types'
 import ErrorMessage from '../components/common/ErrorMessage'
 import LoadingSpinner from '../components/common/LoadingSpinner'
 
@@ -55,6 +56,7 @@ export default function TicketDetail() {
   const [types, setTypes] = useState<TicketType[]>([])
   const [subtypes, setSubtypes] = useState<TicketSubtype[]>([])
   const [users, setUsers] = useState<AdminUser[]>([])
+  const [departments, setDepartments] = useState<Department[]>([])
   const [customer, setCustomer] = useState<Customer | null>(null)
   const [body, setBody] = useState('')
   const [msgType, setMsgType] = useState<'reply' | 'comment'>('reply')
@@ -80,12 +82,14 @@ export default function TicketDetail() {
       getStatuses(),
       getTypes(),
       getAdminUsers(0, 100),
-    ]).then(([t, m, s, ty, u]) => {
+      getDepartments(),
+    ]).then(([t, m, s, ty, u, depts]) => {
       setTicket(t)
       setMessages(m)
       setStatuses(s)
       setTypes(ty)
       setUsers(u.items)
+      setDepartments(depts)
       if (t.type_id) loadSubtypes(t.type_id)
       return getCustomer(t.customer_id)
     }).then(setCustomer)
@@ -358,6 +362,19 @@ export default function TicketDetail() {
                 >
                   <option value="">Sin asignar</option>
                   {users.map(u => <option key={u.id} value={u.id}>{u.full_name}</option>)}
+                </select>
+              </FieldRow>
+
+              {/* Departamento */}
+              <FieldRow label="Departamento" status={fieldStatus['department_id']}>
+                <select
+                  value={ticket.department_id ?? ''}
+                  disabled={fieldStatus['department_id'] === 'saving'}
+                  onChange={e => handleFieldChange('department_id', e.target.value || null)}
+                  className={SELECT_CLS}
+                >
+                  <option value="">Sin departamento</option>
+                  {departments.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
                 </select>
               </FieldRow>
 

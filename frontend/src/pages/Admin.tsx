@@ -7,7 +7,7 @@ import {
   getAdminTenant,
   updateAdminTenant,
 } from '../api/admin'
-import { getChannels, createChannel } from '../api/channels'
+import { getChannels, createChannel, updateChannel } from '../api/channels'
 import {
   getDepartments,
   createDepartment,
@@ -417,66 +417,115 @@ function DeptModal({ dept, onClose, onSaved }: DeptModalProps) {
   )
 }
 
-// ── Manage Agents Modal ────────────────────────────────────────────────────
+// ── Manage Department Modal (Agentes + Canales tabs) ──────────────────────
 
-interface ManageAgentsModalProps {
+interface ManageDeptModalProps {
   dept: Department
   onClose: () => void
 }
 
-function ManageAgentsModal({ dept, onClose }: ManageAgentsModalProps) {
+function ManageDeptModal({ dept, onClose }: ManageDeptModalProps) {
+  const [activeTab, setActiveTab] = useState<'agents' | 'channels'>('agents')
+
+  // ── Agents state ──
   const [agents, setAgents] = useState<DepartmentAgent[]>([])
   const [allUsers, setAllUsers] = useState<AdminUser[]>([])
   const [selectedUserId, setSelectedUserId] = useState('')
-  const [loading, setLoading] = useState(true)
+  const [agentsLoading, setAgentsLoading] = useState(true)
   const [adding, setAdding] = useState(false)
-  const [removingId, setRemovingId] = useState<string | null>(null)
-  const [error, setError] = useState('')
+  const [removingAgentId, setRemovingAgentId] = useState<string | null>(null)
+  const [agentsError, setAgentsError] = useState('')
 
-  const loadData = () => {
-    setLoading(true)
+  // ── Channels state ──
+  const [allChannels, setAllChannels] = useState<Channel[]>([])
+  const [selectedChannelId, setSelectedChannelId] = useState('')
+  const [channelsLoading, setChannelsLoading] = useState(true)
+  const [assigningChannel, setAssigningChannel] = useState(false)
+  const [removingChannelId, setRemovingChannelId] = useState<string | null>(null)
+  const [channelsError, setChannelsError] = useState('')
+
+  const loadAgents = () => {
+    setAgentsLoading(true)
     Promise.all([
       getDepartmentAgents(dept.id),
       getAdminUsers(0, 100).then(r => r.items),
     ])
-      .then(([agts, users]) => {
-        setAgents(agts)
-        setAllUsers(users)
-      })
-      .catch(() => setError('Error al cargar los datos.'))
-      .finally(() => setLoading(false))
+      .then(([agts, users]) => { setAgents(agts); setAllUsers(users) })
+      .catch(() => setAgentsError('Error al cargar los datos.'))
+      .finally(() => setAgentsLoading(false))
   }
 
-  useEffect(() => { loadData() }, [])
+  const loadChannels = () => {
+    setChannelsLoading(true)
+    getChannels(0, 100)
+      .then(r => setAllChannels(r.items))
+      .catch(() => setChannelsError('Error al cargar los canales.'))
+      .finally(() => setChannelsLoading(false))
+  }
 
-  const assignedIds = new Set(agents.map(a => a.id))
-  const available = allUsers.filter(u => !assignedIds.has(u.id) && u.is_active)
+  useEffect(() => { loadAgents(); loadChannels() }, [])
 
-  const handleAdd = async () => {
+  // ── Agent handlers ──
+  const assignedAgentIds = new Set(agents.map(a => a.id))
+  const availableUsers = allUsers.filter(u => !assignedAgentIds.has(u.id) && u.is_active)
+
+  const handleAddAgent = async () => {
     if (!selectedUserId) return
     setAdding(true)
-    setError('')
+    setAgentsError('')
     try {
       await addDepartmentAgent(dept.id, selectedUserId)
       setSelectedUserId('')
-      loadData()
+      loadAgents()
     } catch {
-      setError('Error al agregar el agente.')
+      setAgentsError('Error al agregar el agente.')
     } finally {
       setAdding(false)
     }
   }
 
-  const handleRemove = async (userId: string) => {
-    setRemovingId(userId)
-    setError('')
+  const handleRemoveAgent = async (userId: string) => {
+    setRemovingAgentId(userId)
+    setAgentsError('')
     try {
       await removeDepartmentAgent(dept.id, userId)
-      loadData()
+      loadAgents()
     } catch {
-      setError('Error al quitar el agente.')
+      setAgentsError('Error al quitar el agente.')
     } finally {
-      setRemovingId(null)
+      setRemovingAgentId(null)
+    }
+  }
+
+  // ── Channel handlers ──
+  const deptChannels = allChannels.filter(c => c.department_id === dept.id)
+  const freeChannels = allChannels.filter(c => c.department_id === null && c.is_active)
+
+  const handleAssignChannel = async () => {
+    if (!selectedChannelId) return
+    setAssigningChannel(true)
+    setChannelsError('')
+    try {
+      await updateChannel(selectedChannelId, { department_id: dept.id })
+      setSelectedChannelId('')
+      loadChannels()
+    } catch {
+      setChannelsError('Error al asignar el canal.')
+    } finally {
+      setAssigningChannel(false)
+    }
+  }
+
+  const handleRemoveChannel = async (channelId: string) => {
+    setRemovingChannelId(channelId)
+    setChannelsError('')
+    try {
+      await updateChannel(channelId, { department_id: null })
+      loadChannels()
+    } catch {
+      setChannelsError('Error al quitar el canal.')
+    } finally {
+      setRemovingChannelId(null)
     }
   }
 
@@ -485,78 +534,161 @@ function ManageAgentsModal({ dept, onClose }: ManageAgentsModalProps) {
       <div className="bg-white rounded-lg shadow-xl w-full max-w-md mx-4">
         <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200">
           <h2 className="text-base font-semibold text-gray-900">
-            Agentes — {dept.name}
+            Gestionar — {dept.name}
           </h2>
           <button type="button" onClick={onClose} className="text-gray-400 hover:text-gray-600 text-xl leading-none">×</button>
         </div>
 
-        <div className="px-6 py-5 space-y-4">
-          {error && (
-            <p className="text-sm text-red-600 bg-red-50 border border-red-200 rounded px-3 py-2">{error}</p>
-          )}
+        {/* Tabs */}
+        <div className="flex gap-1 border-b border-gray-200 px-6">
+          {(['agents', 'channels'] as const).map(tab => (
+            <button
+              key={tab}
+              onClick={() => setActiveTab(tab)}
+              className={`px-3 py-2 text-sm font-medium border-b-2 transition-colors -mb-px ${
+                activeTab === tab
+                  ? 'border-blue-600 text-blue-700'
+                  : 'border-transparent text-gray-500 hover:text-gray-700'
+              }`}
+            >
+              {tab === 'agents' ? 'Agentes' : 'Canales'}
+            </button>
+          ))}
+        </div>
 
-          {/* Current agents */}
-          <div>
-            <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-2">
-              Agentes actuales ({agents.length})
-            </p>
-            {loading ? (
-              <LoadingSpinner />
-            ) : agents.length === 0 ? (
-              <p className="text-sm text-gray-400 italic">Sin agentes asignados</p>
-            ) : (
-              <ul className="space-y-1 max-h-48 overflow-y-auto">
-                {agents.map(a => (
-                  <li key={a.id} className="flex items-center justify-between py-1.5 px-2 rounded hover:bg-gray-50">
-                    <div className="min-w-0">
-                      <p className="text-sm text-gray-900 truncate">{a.full_name}</p>
-                      <p className="text-xs text-gray-400 truncate">{a.email}</p>
-                    </div>
-                    <button
-                      onClick={() => handleRemove(a.id)}
-                      disabled={removingId === a.id}
-                      className="ml-3 text-xs text-red-500 hover:text-red-700 shrink-0 disabled:opacity-50"
-                    >
-                      {removingId === a.id ? '...' : 'Quitar'}
-                    </button>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </div>
-
-          {/* Add agent */}
-          {!loading && (
-            <div>
-              <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-2">
-                Agregar agente
-              </p>
-              {available.length === 0 ? (
-                <p className="text-sm text-gray-400 italic">Todos los usuarios ya están asignados</p>
-              ) : (
-                <div className="flex gap-2">
-                  <select
-                    value={selectedUserId}
-                    onChange={e => setSelectedUserId(e.target.value)}
-                    className="flex-1 px-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  >
-                    <option value="">Seleccionar usuario...</option>
-                    {available.map(u => (
-                      <option key={u.id} value={u.id}>
-                        {u.full_name} ({u.email})
-                      </option>
+        <div className="px-6 py-5 space-y-4 min-h-[260px]">
+          {/* ── Agents tab ── */}
+          {activeTab === 'agents' && (
+            <>
+              {agentsError && (
+                <p className="text-sm text-red-600 bg-red-50 border border-red-200 rounded px-3 py-2">{agentsError}</p>
+              )}
+              <div>
+                <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-2">
+                  Agentes actuales ({agents.length})
+                </p>
+                {agentsLoading ? (
+                  <LoadingSpinner />
+                ) : agents.length === 0 ? (
+                  <p className="text-sm text-gray-400 italic">Sin agentes asignados</p>
+                ) : (
+                  <ul className="space-y-1 max-h-40 overflow-y-auto">
+                    {agents.map(a => (
+                      <li key={a.id} className="flex items-center justify-between py-1.5 px-2 rounded hover:bg-gray-50">
+                        <div className="min-w-0">
+                          <p className="text-sm text-gray-900 truncate">{a.full_name}</p>
+                          <p className="text-xs text-gray-400 truncate">{a.email}</p>
+                        </div>
+                        <button
+                          onClick={() => handleRemoveAgent(a.id)}
+                          disabled={removingAgentId === a.id}
+                          className="ml-3 text-xs text-red-500 hover:text-red-700 shrink-0 disabled:opacity-50"
+                        >
+                          {removingAgentId === a.id ? '...' : 'Quitar'}
+                        </button>
+                      </li>
                     ))}
-                  </select>
-                  <button
-                    onClick={handleAdd}
-                    disabled={!selectedUserId || adding}
-                    className="px-3 py-2 text-sm text-white bg-blue-600 rounded-md hover:bg-blue-700 disabled:opacity-50 shrink-0"
-                  >
-                    {adding ? '...' : 'Agregar'}
-                  </button>
+                  </ul>
+                )}
+              </div>
+              {!agentsLoading && (
+                <div>
+                  <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-2">
+                    Agregar agente
+                  </p>
+                  {availableUsers.length === 0 ? (
+                    <p className="text-sm text-gray-400 italic">Todos los usuarios ya están asignados</p>
+                  ) : (
+                    <div className="flex gap-2">
+                      <select
+                        value={selectedUserId}
+                        onChange={e => setSelectedUserId(e.target.value)}
+                        className="flex-1 px-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      >
+                        <option value="">Seleccionar usuario...</option>
+                        {availableUsers.map(u => (
+                          <option key={u.id} value={u.id}>{u.full_name} ({u.email})</option>
+                        ))}
+                      </select>
+                      <button
+                        onClick={handleAddAgent}
+                        disabled={!selectedUserId || adding}
+                        className="px-3 py-2 text-sm text-white bg-blue-600 rounded-md hover:bg-blue-700 disabled:opacity-50 shrink-0"
+                      >
+                        {adding ? '...' : 'Agregar'}
+                      </button>
+                    </div>
+                  )}
                 </div>
               )}
-            </div>
+            </>
+          )}
+
+          {/* ── Channels tab ── */}
+          {activeTab === 'channels' && (
+            <>
+              {channelsError && (
+                <p className="text-sm text-red-600 bg-red-50 border border-red-200 rounded px-3 py-2">{channelsError}</p>
+              )}
+              <div>
+                <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-2">
+                  Canales asignados ({deptChannels.length})
+                </p>
+                {channelsLoading ? (
+                  <LoadingSpinner />
+                ) : deptChannels.length === 0 ? (
+                  <p className="text-sm text-gray-400 italic">Sin canales asignados</p>
+                ) : (
+                  <ul className="space-y-1 max-h-40 overflow-y-auto">
+                    {deptChannels.map(c => (
+                      <li key={c.id} className="flex items-center justify-between py-1.5 px-2 rounded hover:bg-gray-50">
+                        <div className="min-w-0">
+                          <p className="text-sm text-gray-900 truncate">{c.name}</p>
+                          <p className="text-xs text-gray-400 capitalize">{c.channel_type}</p>
+                        </div>
+                        <button
+                          onClick={() => handleRemoveChannel(c.id)}
+                          disabled={removingChannelId === c.id}
+                          className="ml-3 text-xs text-red-500 hover:text-red-700 shrink-0 disabled:opacity-50"
+                        >
+                          {removingChannelId === c.id ? '...' : 'Quitar'}
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+              {!channelsLoading && (
+                <div>
+                  <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-2">
+                    Agregar canal
+                  </p>
+                  {freeChannels.length === 0 ? (
+                    <p className="text-sm text-gray-400 italic">No hay canales disponibles sin departamento</p>
+                  ) : (
+                    <div className="flex gap-2">
+                      <select
+                        value={selectedChannelId}
+                        onChange={e => setSelectedChannelId(e.target.value)}
+                        className="flex-1 px-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      >
+                        <option value="">Seleccionar canal...</option>
+                        {freeChannels.map(c => (
+                          <option key={c.id} value={c.id}>{c.name}</option>
+                        ))}
+                      </select>
+                      <button
+                        onClick={handleAssignChannel}
+                        disabled={!selectedChannelId || assigningChannel}
+                        className="px-3 py-2 text-sm text-white bg-blue-600 rounded-md hover:bg-blue-700 disabled:opacity-50 shrink-0"
+                      >
+                        {assigningChannel ? '...' : 'Asignar'}
+                      </button>
+                    </div>
+                  )}
+                </div>
+              )}
+            </>
           )}
         </div>
 
@@ -568,6 +700,133 @@ function ManageAgentsModal({ dept, onClose }: ManageAgentsModalProps) {
             Cerrar
           </button>
         </div>
+      </div>
+    </div>
+  )
+}
+
+// ── Edit Channel Modal ─────────────────────────────────────────────────────
+
+interface EditChannelModalProps {
+  channel: Channel
+  onClose: () => void
+  onSaved: () => void
+}
+
+function EditChannelModal({ channel, onClose, onSaved }: EditChannelModalProps) {
+  const [fromName, setFromName] = useState('')
+  const [smtpHost, setSmtpHost] = useState('')
+  const [smtpPort, setSmtpPort] = useState('')
+  const [smtpUser, setSmtpUser] = useState('')
+  const [smtpPassword, setSmtpPassword] = useState('')
+  const [imapHost, setImapHost] = useState('')
+  const [imapPort, setImapPort] = useState('')
+  const [departmentId, setDepartmentId] = useState<string>(channel.department_id ?? '')
+  const [departments, setDepartments] = useState<Department[]>([])
+  const [saving, setSaving] = useState(false)
+  const [error, setError] = useState('')
+
+  useEffect(() => {
+    getDepartments().then(setDepartments).catch(() => {})
+  }, [])
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setSaving(true)
+    setError('')
+    try {
+      const patch: Parameters<typeof updateChannel>[1] = {
+        department_id: departmentId || null,
+      }
+      // Only include config if the user filled in at least one config field
+      const hasConfig = fromName || smtpHost || smtpPort || smtpUser || smtpPassword || imapHost || imapPort
+      if (hasConfig) {
+        patch.config = {
+          from_name: fromName,
+          smtp_host: smtpHost,
+          smtp_port: smtpPort,
+          smtp_user: smtpUser,
+          smtp_password: smtpPassword,
+          imap_host: imapHost,
+          imap_port: imapPort,
+        }
+      }
+      await updateChannel(channel.id, patch)
+      onSaved()
+    } catch {
+      setError('Error al guardar los cambios.')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const configField = (label: string, value: string, setter: (v: string) => void, opts?: { type?: string; placeholder?: string }) => (
+    <div>
+      <label className="block text-sm font-medium text-gray-700 mb-1">{label}</label>
+      <input
+        type={opts?.type ?? 'text'}
+        value={value}
+        onChange={e => setter(e.target.value)}
+        placeholder={opts?.placeholder ?? 'Sin cambios'}
+        className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+      />
+    </div>
+  )
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+      <div className="bg-white rounded-lg shadow-xl w-full max-w-lg mx-4 max-h-screen overflow-y-auto">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200">
+          <h2 className="text-base font-semibold text-gray-900">Editar canal</h2>
+          <button type="button" onClick={onClose} className="text-gray-400 hover:text-gray-600 text-xl leading-none">×</button>
+        </div>
+        <form onSubmit={handleSubmit} className="px-6 py-5 space-y-4">
+          {error && (
+            <p className="text-sm text-red-600 bg-red-50 border border-red-200 rounded px-3 py-2">{error}</p>
+          )}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Nombre del canal</label>
+            <input
+              type="text"
+              value={channel.name}
+              readOnly
+              className="w-full px-3 py-2 text-sm border border-gray-200 rounded-md bg-gray-50 text-gray-500 cursor-not-allowed"
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Departamento</label>
+            <select
+              value={departmentId}
+              onChange={e => setDepartmentId(e.target.value)}
+              className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+            >
+              <option value="">Sin departamento</option>
+              {departments.filter(d => d.is_active).map(d => (
+                <option key={d.id} value={d.id}>{d.name}</option>
+              ))}
+            </select>
+          </div>
+          <p className="text-xs text-gray-400 italic">Deja en blanco los campos de configuración para no modificarlos.</p>
+          {configField('Nombre remitente', fromName, setFromName, { placeholder: 'Sin cambios' })}
+          <p className="text-xs font-medium text-gray-500 uppercase tracking-wide pt-1">Configuración SMTP (envío)</p>
+          {configField('SMTP Host', smtpHost, setSmtpHost, { placeholder: 'Sin cambios' })}
+          <div className="grid grid-cols-2 gap-3">
+            {configField('Puerto SMTP', smtpPort, setSmtpPort)}
+            {configField('Usuario SMTP', smtpUser, setSmtpUser)}
+          </div>
+          {configField('Contraseña SMTP', smtpPassword, setSmtpPassword, { type: 'password', placeholder: 'Sin cambios' })}
+          <p className="text-xs font-medium text-gray-500 uppercase tracking-wide pt-1">Configuración IMAP (recepción)</p>
+          <div className="grid grid-cols-2 gap-3">
+            {configField('IMAP Host', imapHost, setImapHost)}
+            {configField('Puerto IMAP', imapPort, setImapPort)}
+          </div>
+          <div className="flex justify-end gap-3 pt-2">
+            <button type="button" onClick={onClose} className="px-4 py-2 text-sm text-gray-700 border border-gray-300 rounded-md hover:bg-gray-50">Cancelar</button>
+            <button type="submit" disabled={saving} className="px-4 py-2 text-sm text-white bg-blue-600 rounded-md hover:bg-blue-700 disabled:opacity-50">
+              {saving ? 'Guardando...' : 'Guardar'}
+            </button>
+          </div>
+        </form>
       </div>
     </div>
   )
@@ -594,6 +853,7 @@ export default function Admin() {
   const [channelsLoading, setChannelsLoading] = useState(false)
   const [channelsError, setChannelsError] = useState<string | null>(null)
   const [showCreateChannel, setShowCreateChannel] = useState(false)
+  const [editingChannel, setEditingChannel] = useState<Channel | null>(null)
   const [channelPage, setChannelPage] = useState(1)
   const [channelTotal, setChannelTotal] = useState(0)
 
@@ -834,6 +1094,7 @@ export default function Admin() {
                     <th className="text-left px-4 py-3 font-medium text-gray-600">Nombre</th>
                     <th className="text-left px-4 py-3 font-medium text-gray-600">Tipo</th>
                     <th className="text-left px-4 py-3 font-medium text-gray-600">Estado</th>
+                    <th className="px-4 py-3" />
                   </tr>
                 </thead>
                 <tbody>
@@ -846,6 +1107,14 @@ export default function Admin() {
                           {c.is_active ? 'Activo' : 'Inactivo'}
                         </span>
                       </td>
+                      <td className="px-4 py-3 text-right">
+                        <button
+                          onClick={() => setEditingChannel(c)}
+                          className="text-xs text-blue-600 hover:text-blue-800"
+                        >
+                          Editar
+                        </button>
+                      </td>
                     </tr>
                   ))}
                 </tbody>
@@ -857,6 +1126,13 @@ export default function Admin() {
             <CreateChannelModal
               onClose={() => setShowCreateChannel(false)}
               onCreated={() => { setShowCreateChannel(false); setChannelPage(1); loadChannels(1) }}
+            />
+          )}
+          {editingChannel && (
+            <EditChannelModal
+              channel={editingChannel}
+              onClose={() => setEditingChannel(null)}
+              onSaved={() => { setEditingChannel(null); loadChannels(channelPage) }}
             />
           )}
         </>
@@ -921,7 +1197,7 @@ export default function Admin() {
                             onClick={() => setManagingDept(d)}
                             className="text-xs text-blue-600 hover:text-blue-800"
                           >
-                            Gestionar agentes
+                            Gestionar
                           </button>
                           <button
                             onClick={() => setEditingDept(d)}
@@ -957,7 +1233,7 @@ export default function Admin() {
             />
           )}
           {managingDept && (
-            <ManageAgentsModal
+            <ManageDeptModal
               dept={managingDept}
               onClose={() => { setManagingDept(null); loadDepts() }}
             />

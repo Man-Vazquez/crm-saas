@@ -76,6 +76,7 @@ class TicketUpdate(BaseModel):
     type_id: uuid.UUID | None = None
     subtype_id: uuid.UUID | None = None
     assigned_to: uuid.UUID | None = None
+    department_id: uuid.UUID | None = None
     resolved_at: datetime | None = None
     updated_by: uuid.UUID | None = None  # set server-side from current_user; ignored if sent by client
 
@@ -97,6 +98,8 @@ class TicketResponse(BaseModel):
     ticket_number: int | None
     updated_by: uuid.UUID | None
     last_activity: str | None
+    department_id: uuid.UUID | None = None
+    department_name: str | None = None
     created_at: datetime
     updated_at: datetime
 
