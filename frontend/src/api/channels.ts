@@ -8,4 +8,5 @@ export const createChannel = (data: {
   channel_type: string
   name: string
   config: Record<string, string>
+  department_id?: string | null
 }) => client.post<Channel>('/channels', data).then(r => r.data)

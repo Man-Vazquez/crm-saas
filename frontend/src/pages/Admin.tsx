@@ -8,16 +8,25 @@ import {
   updateAdminTenant,
 } from '../api/admin'
 import { getChannels, createChannel } from '../api/channels'
-import type { AdminUser, Channel, Tenant } from '../types'
+import {
+  getDepartments,
+  createDepartment,
+  updateDepartment,
+  getDepartmentAgents,
+  addDepartmentAgent,
+  removeDepartmentAgent,
+} from '../api/departments'
+import type { AdminUser, Channel, Department, DepartmentAgent, Tenant } from '../types'
 import ErrorMessage from '../components/common/ErrorMessage'
 import LoadingSpinner from '../components/common/LoadingSpinner'
 import Pagination from '../components/common/Pagination'
 
-type Tab = 'users' | 'channels' | 'account'
+type Tab = 'users' | 'channels' | 'departments' | 'account'
 
 const TABS: { id: Tab; label: string }[] = [
   { id: 'users', label: 'Usuarios' },
   { id: 'channels', label: 'Canales' },
+  { id: 'departments', label: 'Departamentos' },
   { id: 'account', label: 'Cuenta' },
 ]
 
@@ -227,8 +236,14 @@ function CreateChannelModal({ onClose, onCreated }: CreateChannelModalProps) {
   const [imapHost, setImapHost] = useState('')
   const [imapPort, setImapPort] = useState('993')
   const [fromName, setFromName] = useState('')
+  const [departmentId, setDepartmentId] = useState<string>('')
+  const [departments, setDepartments] = useState<Department[]>([])
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
+
+  useEffect(() => {
+    getDepartments().then(setDepartments).catch(() => {})
+  }, [])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -247,6 +262,7 @@ function CreateChannelModal({ onClose, onCreated }: CreateChannelModalProps) {
           imap_port: imapPort,
           from_name: fromName,
         },
+        department_id: departmentId || null,
       })
       onCreated()
     } catch {
@@ -283,6 +299,19 @@ function CreateChannelModal({ onClose, onCreated }: CreateChannelModalProps) {
           )}
           {field('Nombre del canal', name, setName, { placeholder: 'Email soporte' })}
           {field('Nombre remitente', fromName, setFromName, { placeholder: 'Soporte Empresa' })}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Departamento</label>
+            <select
+              value={departmentId}
+              onChange={e => setDepartmentId(e.target.value)}
+              className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+            >
+              <option value="">Sin departamento</option>
+              {departments.filter(d => d.is_active).map(d => (
+                <option key={d.id} value={d.id}>{d.name}</option>
+              ))}
+            </select>
+          </div>
           <p className="text-xs font-medium text-gray-500 uppercase tracking-wide pt-1">Configuración SMTP (envío)</p>
           {field('SMTP Host', smtpHost, setSmtpHost, { placeholder: 'smtp.gmail.com' })}
           <div className="grid grid-cols-2 gap-3">
@@ -302,6 +331,243 @@ function CreateChannelModal({ onClose, onCreated }: CreateChannelModalProps) {
             </button>
           </div>
         </form>
+      </div>
+    </div>
+  )
+}
+
+// ── Create / Edit Department Modal ─────────────────────────────────────────
+
+interface DeptModalProps {
+  dept?: Department
+  onClose: () => void
+  onSaved: () => void
+}
+
+function DeptModal({ dept, onClose, onSaved }: DeptModalProps) {
+  const [name, setName] = useState(dept?.name ?? '')
+  const [description, setDescription] = useState(dept?.description ?? '')
+  const [saving, setSaving] = useState(false)
+  const [error, setError] = useState('')
+
+  const isEdit = !!dept
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!name.trim()) return
+    setSaving(true)
+    setError('')
+    try {
+      if (isEdit) {
+        await updateDepartment(dept.id, { name: name.trim(), description: description.trim() || null })
+      } else {
+        await createDepartment({ name: name.trim(), description: description.trim() || null })
+      }
+      onSaved()
+    } catch {
+      setError('Error al guardar el departamento.')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+      <div className="bg-white rounded-lg shadow-xl w-full max-w-md mx-4">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200">
+          <h2 className="text-base font-semibold text-gray-900">
+            {isEdit ? 'Editar departamento' : 'Nuevo departamento'}
+          </h2>
+          <button type="button" onClick={onClose} className="text-gray-400 hover:text-gray-600 text-xl leading-none">×</button>
+        </div>
+        <form onSubmit={handleSubmit} className="px-6 py-5 space-y-4">
+          {error && (
+            <p className="text-sm text-red-600 bg-red-50 border border-red-200 rounded px-3 py-2">{error}</p>
+          )}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Nombre <span className="text-red-500">*</span>
+            </label>
+            <input
+              type="text"
+              value={name}
+              onChange={e => setName(e.target.value)}
+              className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              required
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Descripción</label>
+            <textarea
+              value={description}
+              onChange={e => setDescription(e.target.value)}
+              rows={3}
+              className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
+            />
+          </div>
+          <div className="flex justify-end gap-3 pt-2">
+            <button type="button" onClick={onClose} className="px-4 py-2 text-sm text-gray-700 border border-gray-300 rounded-md hover:bg-gray-50">Cancelar</button>
+            <button type="submit" disabled={saving} className="px-4 py-2 text-sm text-white bg-blue-600 rounded-md hover:bg-blue-700 disabled:opacity-50">
+              {saving ? 'Guardando...' : 'Guardar'}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  )
+}
+
+// ── Manage Agents Modal ────────────────────────────────────────────────────
+
+interface ManageAgentsModalProps {
+  dept: Department
+  onClose: () => void
+}
+
+function ManageAgentsModal({ dept, onClose }: ManageAgentsModalProps) {
+  const [agents, setAgents] = useState<DepartmentAgent[]>([])
+  const [allUsers, setAllUsers] = useState<AdminUser[]>([])
+  const [selectedUserId, setSelectedUserId] = useState('')
+  const [loading, setLoading] = useState(true)
+  const [adding, setAdding] = useState(false)
+  const [removingId, setRemovingId] = useState<string | null>(null)
+  const [error, setError] = useState('')
+
+  const loadData = () => {
+    setLoading(true)
+    Promise.all([
+      getDepartmentAgents(dept.id),
+      getAdminUsers(0, 100).then(r => r.items),
+    ])
+      .then(([agts, users]) => {
+        setAgents(agts)
+        setAllUsers(users)
+      })
+      .catch(() => setError('Error al cargar los datos.'))
+      .finally(() => setLoading(false))
+  }
+
+  useEffect(() => { loadData() }, [])
+
+  const assignedIds = new Set(agents.map(a => a.id))
+  const available = allUsers.filter(u => !assignedIds.has(u.id) && u.is_active)
+
+  const handleAdd = async () => {
+    if (!selectedUserId) return
+    setAdding(true)
+    setError('')
+    try {
+      await addDepartmentAgent(dept.id, selectedUserId)
+      setSelectedUserId('')
+      loadData()
+    } catch {
+      setError('Error al agregar el agente.')
+    } finally {
+      setAdding(false)
+    }
+  }
+
+  const handleRemove = async (userId: string) => {
+    setRemovingId(userId)
+    setError('')
+    try {
+      await removeDepartmentAgent(dept.id, userId)
+      loadData()
+    } catch {
+      setError('Error al quitar el agente.')
+    } finally {
+      setRemovingId(null)
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+      <div className="bg-white rounded-lg shadow-xl w-full max-w-md mx-4">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200">
+          <h2 className="text-base font-semibold text-gray-900">
+            Agentes — {dept.name}
+          </h2>
+          <button type="button" onClick={onClose} className="text-gray-400 hover:text-gray-600 text-xl leading-none">×</button>
+        </div>
+
+        <div className="px-6 py-5 space-y-4">
+          {error && (
+            <p className="text-sm text-red-600 bg-red-50 border border-red-200 rounded px-3 py-2">{error}</p>
+          )}
+
+          {/* Current agents */}
+          <div>
+            <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-2">
+              Agentes actuales ({agents.length})
+            </p>
+            {loading ? (
+              <LoadingSpinner />
+            ) : agents.length === 0 ? (
+              <p className="text-sm text-gray-400 italic">Sin agentes asignados</p>
+            ) : (
+              <ul className="space-y-1 max-h-48 overflow-y-auto">
+                {agents.map(a => (
+                  <li key={a.id} className="flex items-center justify-between py-1.5 px-2 rounded hover:bg-gray-50">
+                    <div className="min-w-0">
+                      <p className="text-sm text-gray-900 truncate">{a.full_name}</p>
+                      <p className="text-xs text-gray-400 truncate">{a.email}</p>
+                    </div>
+                    <button
+                      onClick={() => handleRemove(a.id)}
+                      disabled={removingId === a.id}
+                      className="ml-3 text-xs text-red-500 hover:text-red-700 shrink-0 disabled:opacity-50"
+                    >
+                      {removingId === a.id ? '...' : 'Quitar'}
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+
+          {/* Add agent */}
+          {!loading && (
+            <div>
+              <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-2">
+                Agregar agente
+              </p>
+              {available.length === 0 ? (
+                <p className="text-sm text-gray-400 italic">Todos los usuarios ya están asignados</p>
+              ) : (
+                <div className="flex gap-2">
+                  <select
+                    value={selectedUserId}
+                    onChange={e => setSelectedUserId(e.target.value)}
+                    className="flex-1 px-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  >
+                    <option value="">Seleccionar usuario...</option>
+                    {available.map(u => (
+                      <option key={u.id} value={u.id}>
+                        {u.full_name} ({u.email})
+                      </option>
+                    ))}
+                  </select>
+                  <button
+                    onClick={handleAdd}
+                    disabled={!selectedUserId || adding}
+                    className="px-3 py-2 text-sm text-white bg-blue-600 rounded-md hover:bg-blue-700 disabled:opacity-50 shrink-0"
+                  >
+                    {adding ? '...' : 'Agregar'}
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+
+        <div className="px-6 pb-5 flex justify-end">
+          <button
+            onClick={onClose}
+            className="px-4 py-2 text-sm text-gray-700 border border-gray-300 rounded-md hover:bg-gray-50"
+          >
+            Cerrar
+          </button>
+        </div>
       </div>
     </div>
   )
@@ -331,6 +597,14 @@ export default function Admin() {
   const [channelPage, setChannelPage] = useState(1)
   const [channelTotal, setChannelTotal] = useState(0)
 
+  // Departments
+  const [depts, setDepts] = useState<Department[]>([])
+  const [deptsLoading, setDeptsLoading] = useState(false)
+  const [deptsError, setDeptsError] = useState<string | null>(null)
+  const [showCreateDept, setShowCreateDept] = useState(false)
+  const [editingDept, setEditingDept] = useState<Department | null>(null)
+  const [managingDept, setManagingDept] = useState<Department | null>(null)
+
   // Account
   const [tenant, setTenant] = useState<Tenant | null>(null)
   const [tenantLoading, setTenantLoading] = useState(false)
@@ -357,6 +631,15 @@ export default function Admin() {
       .finally(() => setChannelsLoading(false))
   }
 
+  const loadDepts = () => {
+    setDeptsLoading(true)
+    setDeptsError(null)
+    getDepartments()
+      .then(setDepts)
+      .catch(() => setDeptsError('No se pudieron cargar los departamentos. Verifica tu conexión.'))
+      .finally(() => setDeptsLoading(false))
+  }
+
   const loadTenant = () => {
     setTenantLoading(true)
     setTenantError(null)
@@ -378,6 +661,10 @@ export default function Admin() {
   }, [activeTab, channelPage])
 
   useEffect(() => {
+    if (activeTab === 'departments') loadDepts()
+  }, [activeTab])
+
+  useEffect(() => {
     if (activeTab === 'account' && !tenant) loadTenant()
   }, [activeTab])
 
@@ -386,6 +673,17 @@ export default function Admin() {
     await deleteAdminUser(user.id)
     setUserPage(1)
     loadUsers(1)
+  }
+
+  const handleToggleDept = async (dept: Department) => {
+    const action = dept.is_active ? 'desactivar' : 'activar'
+    if (!confirm(`¿${action.charAt(0).toUpperCase() + action.slice(1)} el departamento "${dept.name}"?`)) return
+    try {
+      await updateDepartment(dept.id, { is_active: !dept.is_active })
+      loadDepts()
+    } catch {
+      // ignore
+    }
   }
 
   const handleSaveTenant = async (e: React.FormEvent) => {
@@ -559,6 +857,109 @@ export default function Admin() {
             <CreateChannelModal
               onClose={() => setShowCreateChannel(false)}
               onCreated={() => { setShowCreateChannel(false); setChannelPage(1); loadChannels(1) }}
+            />
+          )}
+        </>
+      )}
+
+      {/* ── Departments tab ── */}
+      {activeTab === 'departments' && (
+        <>
+          <div className="flex justify-end mb-4">
+            <button
+              onClick={() => setShowCreateDept(true)}
+              className="px-4 py-2 text-sm text-white bg-blue-600 rounded-md hover:bg-blue-700"
+            >
+              Nuevo departamento
+            </button>
+          </div>
+          {deptsError && (
+            <ErrorMessage message={deptsError} onRetry={loadDepts} />
+          )}
+          <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
+            {deptsLoading ? (
+              <LoadingSpinner />
+            ) : depts.length === 0 ? (
+              <div className="p-8 text-center text-sm text-gray-400">No hay departamentos</div>
+            ) : (
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-gray-200 bg-gray-50">
+                    <th className="text-left px-4 py-3 font-medium text-gray-600">Nombre</th>
+                    <th className="text-left px-4 py-3 font-medium text-gray-600">Descripción</th>
+                    <th className="text-center px-4 py-3 font-medium text-gray-600">Agentes</th>
+                    <th className="text-center px-4 py-3 font-medium text-gray-600">Canales</th>
+                    <th className="text-left px-4 py-3 font-medium text-gray-600">Estado</th>
+                    <th className="px-4 py-3" />
+                  </tr>
+                </thead>
+                <tbody>
+                  {depts.map(d => (
+                    <tr key={d.id} className="border-b border-gray-100 last:border-0 hover:bg-gray-50">
+                      <td className="px-4 py-3 font-medium text-gray-900">{d.name}</td>
+                      <td className="px-4 py-3 text-gray-500 max-w-[200px] truncate">
+                        {d.description ?? <span className="text-gray-300">—</span>}
+                      </td>
+                      <td className="px-4 py-3 text-center">
+                        <span className="inline-flex items-center justify-center px-2 py-0.5 rounded-full text-xs font-medium bg-blue-50 text-blue-700">
+                          {d.agent_count}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3 text-center">
+                        <span className="inline-flex items-center justify-center px-2 py-0.5 rounded-full text-xs font-medium bg-purple-50 text-purple-700">
+                          {d.channel_count}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3">
+                        <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${d.is_active ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-400'}`}>
+                          {d.is_active ? 'Activo' : 'Inactivo'}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3">
+                        <div className="flex justify-end gap-2 whitespace-nowrap">
+                          <button
+                            onClick={() => setManagingDept(d)}
+                            className="text-xs text-blue-600 hover:text-blue-800"
+                          >
+                            Gestionar agentes
+                          </button>
+                          <button
+                            onClick={() => setEditingDept(d)}
+                            className="text-xs text-blue-600 hover:text-blue-800"
+                          >
+                            Editar
+                          </button>
+                          <button
+                            onClick={() => handleToggleDept(d)}
+                            className={`text-xs ${d.is_active ? 'text-red-500 hover:text-red-700' : 'text-green-600 hover:text-green-800'}`}
+                          >
+                            {d.is_active ? 'Desactivar' : 'Activar'}
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+          </div>
+          {showCreateDept && (
+            <DeptModal
+              onClose={() => setShowCreateDept(false)}
+              onSaved={() => { setShowCreateDept(false); loadDepts() }}
+            />
+          )}
+          {editingDept && (
+            <DeptModal
+              dept={editingDept}
+              onClose={() => setEditingDept(null)}
+              onSaved={() => { setEditingDept(null); loadDepts() }}
+            />
+          )}
+          {managingDept && (
+            <ManageAgentsModal
+              dept={managingDept}
+              onClose={() => { setManagingDept(null); loadDepts() }}
             />
           )}
         </>

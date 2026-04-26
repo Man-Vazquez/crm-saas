@@ -32,6 +32,11 @@ class Channel(Base):
     # WhatsApp:  { "phone_number_id", "access_token", "verify_token" }
     config: Mapped[dict] = mapped_column(JSONB, nullable=False, default=dict)
 
+    department_id: Mapped[UUID | None] = mapped_column(
+        PGUUID(as_uuid=True),
+        ForeignKey("departments.id", ondelete="SET NULL"),
+        nullable=True,
+    )
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
 
     created_at: Mapped[datetime] = mapped_column(

@@ -15,7 +15,9 @@ export type Ticket        = components['schemas']['TicketResponse'] & {
 }
 export type Customer      = components['schemas']['CustomerResponse']
 export type Message       = components['schemas']['MessageResponse']
-export type Channel       = components['schemas']['ChannelResponse']
+export type Channel       = components['schemas']['ChannelResponse'] & {
+  department_id: string | null
+}
 export type Tenant        = components['schemas']['TenantResponse']
 
 // ── Auth / users ─────────────────────────────────────────────────────────────
@@ -38,6 +40,25 @@ export type TicketsByChannelItem  = components['schemas']['TicketsByChannelItem'
 export type TicketsByAgentItem    = components['schemas']['TicketsByAgentItem']
 export type TicketsByTypeItem     = components['schemas']['TicketsByTypeItem']
 export type DailyTicketsItem      = components['schemas']['DailyTicketsItem']
+
+// ── Departments ───────────────────────────────────────────────────────────────
+
+export interface Department {
+  id: string
+  name: string
+  description: string | null
+  is_active: boolean
+  agent_count: number
+  channel_count: number
+  created_at: string
+}
+
+export interface DepartmentAgent {
+  id: string
+  full_name: string
+  email: string
+  role: string
+}
 
 // ── Generic pagination wrapper ────────────────────────────────────────────────
 // Not in the OpenAPI schema (the backend uses inline dict returns), so it stays

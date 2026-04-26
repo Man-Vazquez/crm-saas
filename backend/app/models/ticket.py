@@ -45,6 +45,11 @@ class Ticket(Base):
         UUID(as_uuid=True), ForeignKey("users.id"), nullable=True
     )
     last_activity: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    department_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("departments.id", ondelete="SET NULL"),
+        nullable=True,
+    )
     search_vector: Mapped[str | None] = mapped_column(TSVECTOR, nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         TIMESTAMP(timezone=True), nullable=False, default=lambda: datetime.now(timezone.utc)
