@@ -15,4 +15,5 @@ export const updateChannel = (id: string, data: {
   config?: Record<string, string>
   is_active?: boolean
   department_id?: string | null
+  agent_id?: string | null
 }) => client.patch<Channel>(`/channels/${id}`, data).then(r => r.data)

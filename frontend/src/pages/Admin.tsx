@@ -438,10 +438,12 @@ function ManageDeptModal({ dept, onClose }: ManageDeptModalProps) {
 
   // ── Channels state ──
   const [allChannels, setAllChannels] = useState<Channel[]>([])
+  const [deptAgents, setDeptAgents] = useState<DepartmentAgent[]>([])
   const [selectedChannelId, setSelectedChannelId] = useState('')
   const [channelsLoading, setChannelsLoading] = useState(true)
   const [assigningChannel, setAssigningChannel] = useState(false)
   const [removingChannelId, setRemovingChannelId] = useState<string | null>(null)
+  const [channelAgentSaving, setChannelAgentSaving] = useState<string | null>(null)
   const [channelsError, setChannelsError] = useState('')
 
   const loadAgents = () => {
@@ -457,8 +459,11 @@ function ManageDeptModal({ dept, onClose }: ManageDeptModalProps) {
 
   const loadChannels = () => {
     setChannelsLoading(true)
-    getChannels(0, 100)
-      .then(r => setAllChannels(r.items))
+    Promise.all([
+      getChannels(0, 100).then(r => r.items),
+      getDepartmentAgents(dept.id),
+    ])
+      .then(([chs, agts]) => { setAllChannels(chs); setDeptAgents(agts) })
       .catch(() => setChannelsError('Error al cargar los canales.'))
       .finally(() => setChannelsLoading(false))
   }
@@ -526,6 +531,19 @@ function ManageDeptModal({ dept, onClose }: ManageDeptModalProps) {
       setChannelsError('Error al quitar el canal.')
     } finally {
       setRemovingChannelId(null)
+    }
+  }
+
+  const handleChannelAgentChange = async (channelId: string, agentId: string) => {
+    setChannelAgentSaving(channelId)
+    setChannelsError('')
+    try {
+      await updateChannel(channelId, { agent_id: agentId || null })
+      setAllChannels(prev => prev.map(c => c.id === channelId ? { ...c, agent_id: agentId || null } : c))
+    } catch {
+      setChannelsError('Error al asignar el agente al canal.')
+    } finally {
+      setChannelAgentSaving(null)
     }
   }
 
@@ -639,20 +657,36 @@ function ManageDeptModal({ dept, onClose }: ManageDeptModalProps) {
                 ) : deptChannels.length === 0 ? (
                   <p className="text-sm text-gray-400 italic">Sin canales asignados</p>
                 ) : (
-                  <ul className="space-y-1 max-h-40 overflow-y-auto">
+                  <ul className="space-y-2 max-h-52 overflow-y-auto">
                     {deptChannels.map(c => (
-                      <li key={c.id} className="flex items-center justify-between py-1.5 px-2 rounded hover:bg-gray-50">
-                        <div className="min-w-0">
-                          <p className="text-sm text-gray-900 truncate">{c.name}</p>
-                          <p className="text-xs text-gray-400 capitalize">{c.channel_type}</p>
+                      <li key={c.id} className="py-2 px-2 rounded bg-gray-50">
+                        <div className="flex items-center justify-between mb-1.5">
+                          <div className="min-w-0">
+                            <p className="text-sm text-gray-900 truncate">{c.name}</p>
+                            <p className="text-xs text-gray-400 capitalize">{c.channel_type}</p>
+                          </div>
+                          <button
+                            onClick={() => handleRemoveChannel(c.id)}
+                            disabled={removingChannelId === c.id}
+                            className="ml-3 text-xs text-red-500 hover:text-red-700 shrink-0 disabled:opacity-50"
+                          >
+                            {removingChannelId === c.id ? '...' : 'Quitar'}
+                          </button>
                         </div>
-                        <button
-                          onClick={() => handleRemoveChannel(c.id)}
-                          disabled={removingChannelId === c.id}
-                          className="ml-3 text-xs text-red-500 hover:text-red-700 shrink-0 disabled:opacity-50"
-                        >
-                          {removingChannelId === c.id ? '...' : 'Quitar'}
-                        </button>
+                        <div className="flex items-center gap-2">
+                          <label className="text-xs text-gray-500 shrink-0">Agente:</label>
+                          <select
+                            value={c.agent_id ?? ''}
+                            disabled={channelAgentSaving === c.id}
+                            onChange={e => handleChannelAgentChange(c.id, e.target.value)}
+                            className="flex-1 px-2 py-1 text-xs border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-400 disabled:opacity-50"
+                          >
+                            <option value="">Sin agente</option>
+                            {deptAgents.map(a => (
+                              <option key={a.id} value={a.id}>{a.full_name}</option>
+                            ))}
+                          </select>
+                        </div>
                       </li>
                     ))}
                   </ul>
@@ -722,13 +756,21 @@ function EditChannelModal({ channel, onClose, onSaved }: EditChannelModalProps) 
   const [imapHost, setImapHost] = useState('')
   const [imapPort, setImapPort] = useState('')
   const [departmentId, setDepartmentId] = useState<string>(channel.department_id ?? '')
+  const [agentId, setAgentId] = useState<string>(channel.agent_id ?? '')
   const [departments, setDepartments] = useState<Department[]>([])
+  const [deptAgents, setDeptAgents] = useState<DepartmentAgent[]>([])
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
 
   useEffect(() => {
     getDepartments().then(setDepartments).catch(() => {})
   }, [])
+
+  // Reload dept agents whenever department selection changes
+  useEffect(() => {
+    if (!departmentId) { setDeptAgents([]); return }
+    getDepartmentAgents(departmentId).then(setDeptAgents).catch(() => setDeptAgents([]))
+  }, [departmentId])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -737,6 +779,7 @@ function EditChannelModal({ channel, onClose, onSaved }: EditChannelModalProps) 
     try {
       const patch: Parameters<typeof updateChannel>[1] = {
         department_id: departmentId || null,
+        agent_id: agentId || null,
       }
       // Only include config if the user filled in at least one config field
       const hasConfig = fromName || smtpHost || smtpPort || smtpUser || smtpPassword || imapHost || imapPort
@@ -797,7 +840,7 @@ function EditChannelModal({ channel, onClose, onSaved }: EditChannelModalProps) 
             <label className="block text-sm font-medium text-gray-700 mb-1">Departamento</label>
             <select
               value={departmentId}
-              onChange={e => setDepartmentId(e.target.value)}
+              onChange={e => { setDepartmentId(e.target.value); setAgentId('') }}
               className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
             >
               <option value="">Sin departamento</option>
@@ -805,6 +848,23 @@ function EditChannelModal({ channel, onClose, onSaved }: EditChannelModalProps) 
                 <option key={d.id} value={d.id}>{d.name}</option>
               ))}
             </select>
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Agente responsable</label>
+            {!departmentId ? (
+              <p className="text-xs text-gray-400 italic">Asigna un departamento primero para seleccionar agente</p>
+            ) : (
+              <select
+                value={agentId}
+                onChange={e => setAgentId(e.target.value)}
+                className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              >
+                <option value="">Sin agente asignado</option>
+                {deptAgents.map(a => (
+                  <option key={a.id} value={a.id}>{a.full_name}</option>
+                ))}
+              </select>
+            )}
           </div>
           <p className="text-xs text-gray-400 italic">Deja en blanco los campos de configuración para no modificarlos.</p>
           {configField('Nombre remitente', fromName, setFromName, { placeholder: 'Sin cambios' })}

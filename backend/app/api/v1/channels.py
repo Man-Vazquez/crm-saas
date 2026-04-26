@@ -31,7 +31,7 @@ async def create_channel(
     """Crea un canal nuevo para el tenant. Solo admins."""
     if current_user.role.value != "admin":
         raise HTTPException(status_code=403, detail="Solo administradores pueden crear canales")
-    return await repo.create(db, data.channel_type, data.name, data.config, data.department_id)
+    return await repo.create(db, data.channel_type, data.name, data.config, data.department_id, data.agent_id)
 
 
 @router.get("", response_model=dict)

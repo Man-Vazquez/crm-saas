@@ -8,6 +8,7 @@ class ChannelCreate(BaseModel):
     name: str                   # "Email soporte", "WhatsApp ventas"
     config: dict                # credenciales — se encriptan antes de guardar
     department_id: UUID | None = None
+    agent_id: UUID | None = None
 
 
 class ChannelUpdate(BaseModel):
@@ -15,6 +16,7 @@ class ChannelUpdate(BaseModel):
     config: dict | None = None
     is_active: bool | None = None
     department_id: UUID | None = None
+    agent_id: UUID | None = None
 
 
 class ChannelResponse(BaseModel):
@@ -24,6 +26,7 @@ class ChannelResponse(BaseModel):
     name: str
     is_active: bool
     department_id: UUID | None
+    agent_id: UUID | None
     created_at: datetime
 
     # config NO se devuelve en la response — nunca exponemos credenciales

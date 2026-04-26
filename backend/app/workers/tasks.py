@@ -78,12 +78,13 @@ async def _process_email(payload: dict, channel_id: str, tenant_id: str) -> None
         async with async_session() as session:
             async with session.begin():
 
-                # ── 0. Resolve channel → department_id ─────────────────────
+                # ── 0. Resolve channel → department_id + agent_id ──────────
                 result = await session.execute(
                     select(Channel).where(Channel.id == channel_uuid)
                 )
                 channel_obj = result.scalar_one_or_none()
                 department_id = channel_obj.department_id if channel_obj else None
+                agent_id = channel_obj.agent_id if channel_obj else None
 
                 # ── 1. Find or create customer ──────────────────────────────
                 result = await session.execute(
@@ -182,6 +183,7 @@ async def _process_email(payload: dict, channel_id: str, tenant_id: str) -> None
                         channel_id=channel_uuid,
                         priority="medium",
                         department_id=department_id,
+                        assigned_to=agent_id,
                     )
                     session.add(ticket)
                     await session.flush()

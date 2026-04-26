@@ -37,6 +37,11 @@ class Channel(Base):
         ForeignKey("departments.id", ondelete="SET NULL"),
         nullable=True,
     )
+    agent_id: Mapped[UUID | None] = mapped_column(
+        PGUUID(as_uuid=True),
+        ForeignKey("users.id", ondelete="SET NULL"),
+        nullable=True,
+    )
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
 
     created_at: Mapped[datetime] = mapped_column(
