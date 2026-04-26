@@ -130,11 +130,24 @@ class EmailChannel(BaseChannel):
                         plain_body = part.get_payload(decode=True).decode("utf-8", errors="replace")
                     elif ct == "text/html" and not html_body:
                         html_body = part.get_payload(decode=True).decode("utf-8", errors="replace")
-                # Prefer HTML so the frontend can render rich email content.
-                # Fall back to plain text for plain-text-only emails.
-                body = html_body or plain_body
             else:
-                body = parsed_email.get_payload(decode=True).decode("utf-8", errors="replace")
+                raw = parsed_email.get_payload(decode=True).decode("utf-8", errors="replace")
+                ct  = parsed_email.get_content_type()
+                if ct == "text/html":
+                    html_body = raw
+                else:
+                    plain_body = raw
+
+            # body  = texto plano → usado para search_vector (trigger de PostgreSQL)
+            # body_html = HTML original → renderizado en el frontend con DOMPurify
+            if html_body and plain_body:
+                body = plain_body
+            elif html_body:
+                body = self._strip_html(html_body)
+            else:
+                body = plain_body
+
+            body_html = html_body if html_body else None
 
             from_email = self._extract_email(from_raw)
             to_email   = self._extract_email(to_raw)
@@ -158,6 +171,7 @@ class EmailChannel(BaseChannel):
                     "message_id": msg_id,
                     "in_reply_to": in_reply_to,
                     "body": body.strip(),
+                    "body_html": body_html,
                 },
             )
         except Exception as e:

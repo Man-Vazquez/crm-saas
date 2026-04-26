@@ -67,7 +67,8 @@ async def _process_email(payload: dict, channel_id: str, tenant_id: str) -> None
     cleaned_subject = _clean_subject(raw_subject) or raw_subject or "(sin asunto)"
     in_reply_to = payload.get("in_reply_to")
     message_id = payload.get("message_id", "")
-    body = payload.get("body") or payload.get("text") or ""
+    body      = payload.get("body") or payload.get("text") or ""
+    body_html = payload.get("body_html")  # None para emails solo texto plano
 
     engine = create_async_engine(settings.DATABASE_URL)
     async_session = sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
@@ -202,6 +203,7 @@ async def _process_email(payload: dict, channel_id: str, tenant_id: str) -> None
                     ticket_id=ticket.id,
                     author_id=None,
                     body=body,
+                    body_html=body_html,
                     direction="inbound",
                     msg_type="reply",
                     external_id=message_id or None,

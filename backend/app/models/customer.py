@@ -1,7 +1,7 @@
 import uuid
 from sqlalchemy import String, Boolean, ForeignKey, Text, TIMESTAMP, text as sa_text
 from sqlalchemy.orm import Mapped, mapped_column
-from sqlalchemy.dialects.postgresql import UUID, JSONB
+from sqlalchemy.dialects.postgresql import UUID, JSONB, TSVECTOR
 from datetime import datetime, timezone
 from app.core.database import Base
 
@@ -22,6 +22,7 @@ class Customer(Base):
     notes: Mapped[str | None] = mapped_column(Text, nullable=True)
     custom_fields: Mapped[dict] = mapped_column(JSONB, nullable=False, default=dict)
     is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+    search_vector: Mapped[str | None] = mapped_column(TSVECTOR, nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         TIMESTAMP(timezone=True), nullable=False, default=lambda: datetime.now(timezone.utc)
     )

@@ -1,7 +1,7 @@
 import uuid
 from sqlalchemy import String, Boolean, ForeignKey, Text, TIMESTAMP, Integer, text as sa_text
 from sqlalchemy.orm import Mapped, mapped_column
-from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy.dialects.postgresql import UUID, TSVECTOR
 from datetime import datetime, timezone
 from app.core.database import Base
 
@@ -45,6 +45,7 @@ class Ticket(Base):
         UUID(as_uuid=True), ForeignKey("users.id"), nullable=True
     )
     last_activity: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    search_vector: Mapped[str | None] = mapped_column(TSVECTOR, nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         TIMESTAMP(timezone=True), nullable=False, default=lambda: datetime.now(timezone.utc)
     )

@@ -1,7 +1,7 @@
 import uuid
 from sqlalchemy import String, ForeignKey, Text, TIMESTAMP, text as sa_text
 from sqlalchemy.orm import Mapped, mapped_column
-from sqlalchemy.dialects.postgresql import UUID, JSONB
+from sqlalchemy.dialects.postgresql import UUID, JSONB, TSVECTOR
 from datetime import datetime, timezone
 from app.core.database import Base
 
@@ -29,6 +29,12 @@ class Message(Base):
     # El índice parcial uq_messages_tenant_external_id garantiza unicidad por tenant
     # solo cuando external_id IS NOT NULL (los NULL no se comparan entre sí en SQL).
     external_id: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    # HTML original del email para renderizado en el frontend. body contiene texto plano
+    # para búsqueda full-text. Null para mensajes manuales y notas internas.
+    body_html: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # Vector de búsqueda full-text. Actualizado automáticamente por trigger de PostgreSQL.
+    # En tests hay que actualizar manualmente (los triggers no se crean con create_all).
+    search_vector: Mapped[str | None] = mapped_column(TSVECTOR, nullable=True)
     metadata_: Mapped[dict] = mapped_column(
         "metadata", JSONB, nullable=False, default=dict
     )
