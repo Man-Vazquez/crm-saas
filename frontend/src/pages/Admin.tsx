@@ -151,6 +151,69 @@ function EditUserModal({ user, onClose, onSaved }: EditUserModalProps) {
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
 
+  // Department state
+  const [userDepts, setUserDepts] = useState<Department[]>([])
+  const [allDepts, setAllDepts] = useState<Department[]>([])
+  const [deptLoading, setDeptLoading] = useState(true)
+  const [deptError, setDeptError] = useState('')
+  const [selectedDeptId, setSelectedDeptId] = useState('')
+  const [removingDeptId, setRemovingDeptId] = useState<string | null>(null)
+  const [addingDept, setAddingDept] = useState(false)
+
+  const loadDeptData = async () => {
+    setDeptLoading(true)
+    setDeptError('')
+    try {
+      const allD = await getDepartments()
+      setAllDepts(allD)
+      const memberDepts: Department[] = []
+      await Promise.all(
+        allD.filter(d => d.is_active).map(async d => {
+          const agents = await getDepartmentAgents(d.id)
+          if (agents.some(a => a.id === user.id)) memberDepts.push(d)
+        })
+      )
+      memberDepts.sort((a, b) => a.name.localeCompare(b.name))
+      setUserDepts(memberDepts)
+    } catch {
+      setDeptError('Error al cargar los departamentos.')
+    } finally {
+      setDeptLoading(false)
+    }
+  }
+
+  useEffect(() => { loadDeptData() }, [])
+
+  const handleRemoveDept = async (deptId: string) => {
+    setRemovingDeptId(deptId)
+    setDeptError('')
+    try {
+      await removeDepartmentAgent(deptId, user.id)
+      await loadDeptData()
+    } catch {
+      setDeptError('Error al quitar el departamento.')
+    } finally {
+      setRemovingDeptId(null)
+    }
+  }
+
+  const handleAddDept = async () => {
+    if (!selectedDeptId) return
+    setAddingDept(true)
+    setDeptError('')
+    try {
+      await addDepartmentAgent(selectedDeptId, user.id)
+      setSelectedDeptId('')
+      await loadDeptData()
+    } catch {
+      setDeptError('Error al agregar el departamento.')
+    } finally {
+      setAddingDept(false)
+    }
+  }
+
+  const availableDepts = allDepts.filter(d => d.is_active && !userDepts.some(ud => ud.id === d.id))
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setSaving(true)
@@ -167,54 +230,112 @@ function EditUserModal({ user, onClose, onSaved }: EditUserModalProps) {
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
-      <div className="bg-white rounded-lg shadow-xl w-full max-w-md mx-4">
-        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200">
+      <div className="bg-white rounded-lg shadow-xl w-full max-w-md mx-4 max-h-[90vh] flex flex-col">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 shrink-0">
           <h2 className="text-base font-semibold text-gray-900">Editar usuario</h2>
           <button type="button" onClick={onClose} className="text-gray-400 hover:text-gray-600 text-xl leading-none">×</button>
         </div>
-        <form onSubmit={handleSubmit} className="px-6 py-5 space-y-4">
-          {error && (
-            <p className="text-sm text-red-600 bg-red-50 border border-red-200 rounded px-3 py-2">{error}</p>
-          )}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Nombre completo</label>
-            <input
-              type="text"
-              value={fullName}
-              onChange={e => setFullName(e.target.value)}
-              className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-              required
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Rol</label>
-            <select
-              value={role}
-              onChange={e => setRole(e.target.value as AdminUser['role'])}
-              className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-            >
-              <option value="agent">Agente</option>
-              <option value="supervisor">Supervisor</option>
-              <option value="admin">Admin</option>
-            </select>
-          </div>
-          <div className="flex items-center gap-3">
-            <input
-              id="is_active"
-              type="checkbox"
-              checked={isActive}
-              onChange={e => setIsActive(e.target.checked)}
-              className="h-4 w-4 rounded border-gray-300 text-blue-600"
-            />
-            <label htmlFor="is_active" className="text-sm text-gray-700">Usuario activo</label>
-          </div>
-          <div className="flex justify-end gap-3 pt-2">
-            <button type="button" onClick={onClose} className="px-4 py-2 text-sm text-gray-700 border border-gray-300 rounded-md hover:bg-gray-50">Cancelar</button>
-            <button type="submit" disabled={saving} className="px-4 py-2 text-sm text-white bg-blue-600 rounded-md hover:bg-blue-700 disabled:opacity-50">
-              {saving ? 'Guardando...' : 'Guardar'}
-            </button>
-          </div>
-        </form>
+        <div className="overflow-y-auto flex-1">
+          <form onSubmit={handleSubmit} className="px-6 py-5 space-y-4">
+            {error && (
+              <p className="text-sm text-red-600 bg-red-50 border border-red-200 rounded px-3 py-2">{error}</p>
+            )}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Nombre completo</label>
+              <input
+                type="text"
+                value={fullName}
+                onChange={e => setFullName(e.target.value)}
+                className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                required
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Rol</label>
+              <select
+                value={role}
+                onChange={e => setRole(e.target.value as AdminUser['role'])}
+                className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              >
+                <option value="agent">Agente</option>
+                <option value="supervisor">Supervisor</option>
+                <option value="admin">Admin</option>
+              </select>
+            </div>
+            <div className="flex items-center gap-3">
+              <input
+                id="is_active"
+                type="checkbox"
+                checked={isActive}
+                onChange={e => setIsActive(e.target.checked)}
+                className="h-4 w-4 rounded border-gray-300 text-blue-600"
+              />
+              <label htmlFor="is_active" className="text-sm text-gray-700">Usuario activo</label>
+            </div>
+
+            {/* Departments section */}
+            <div className="border-t border-gray-100 pt-4">
+              <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-3">Departamentos</p>
+              {deptError && (
+                <p className="text-sm text-red-600 bg-red-50 border border-red-200 rounded px-3 py-2 mb-2">{deptError}</p>
+              )}
+              {deptLoading ? (
+                <p className="text-sm text-gray-400 italic">Cargando...</p>
+              ) : (
+                <>
+                  {userDepts.length === 0 ? (
+                    <p className="text-sm text-gray-400 italic mb-3">Sin departamentos asignados</p>
+                  ) : (
+                    <ul className="space-y-1 mb-3 max-h-32 overflow-y-auto">
+                      {userDepts.map(d => (
+                        <li key={d.id} className="flex items-center justify-between py-1 px-2 rounded hover:bg-gray-50">
+                          <span className="text-sm text-gray-800">{d.name}</span>
+                          <button
+                            type="button"
+                            onClick={() => handleRemoveDept(d.id)}
+                            disabled={removingDeptId === d.id}
+                            className="ml-3 text-xs text-red-500 hover:text-red-700 shrink-0 disabled:opacity-50"
+                          >
+                            {removingDeptId === d.id ? '...' : 'Quitar'}
+                          </button>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                  {availableDepts.length > 0 && (
+                    <div className="flex gap-2">
+                      <select
+                        value={selectedDeptId}
+                        onChange={e => setSelectedDeptId(e.target.value)}
+                        className="flex-1 px-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      >
+                        <option value="">Agregar a departamento...</option>
+                        {availableDepts.map(d => (
+                          <option key={d.id} value={d.id}>{d.name}</option>
+                        ))}
+                      </select>
+                      <button
+                        type="button"
+                        onClick={handleAddDept}
+                        disabled={!selectedDeptId || addingDept}
+                        className="px-3 py-2 text-sm text-white bg-blue-600 rounded-md hover:bg-blue-700 disabled:opacity-50 shrink-0"
+                      >
+                        {addingDept ? '...' : 'Agregar'}
+                      </button>
+                    </div>
+                  )}
+                </>
+              )}
+            </div>
+
+            <div className="flex justify-end gap-3 pt-2">
+              <button type="button" onClick={onClose} className="px-4 py-2 text-sm text-gray-700 border border-gray-300 rounded-md hover:bg-gray-50">Cancelar</button>
+              <button type="submit" disabled={saving} className="px-4 py-2 text-sm text-white bg-blue-600 rounded-md hover:bg-blue-700 disabled:opacity-50">
+                {saving ? 'Guardando...' : 'Guardar'}
+              </button>
+            </div>
+          </form>
+        </div>
       </div>
     </div>
   )
@@ -907,6 +1028,7 @@ export default function Admin() {
   const [editingUser, setEditingUser] = useState<AdminUser | null>(null)
   const [userPage, setUserPage] = useState(1)
   const [userTotal, setUserTotal] = useState(0)
+  const [userDeptMap, setUserDeptMap] = useState<Map<string, string[]>>(new Map())
 
   // Channels
   const [channels, setChannels] = useState<Channel[]>([])
@@ -942,6 +1064,26 @@ export default function Admin() {
       .finally(() => setUsersLoading(false))
   }
 
+  const loadUserDeptMap = async () => {
+    try {
+      const allD = await getDepartments()
+      const map = new Map<string, string[]>()
+      await Promise.all(
+        allD.filter(d => d.is_active).map(async d => {
+          const agents = await getDepartmentAgents(d.id)
+          for (const a of agents) {
+            const names = map.get(a.id) ?? []
+            names.push(d.name)
+            map.set(a.id, names)
+          }
+        })
+      )
+      setUserDeptMap(new Map(map))
+    } catch {
+      // non-critical — table still renders without dept badges
+    }
+  }
+
   const loadChannels = (page = 1) => {
     setChannelsLoading(true)
     setChannelsError(null)
@@ -973,7 +1115,7 @@ export default function Admin() {
   }
 
   useEffect(() => {
-    if (activeTab === 'users') loadUsers(userPage)
+    if (activeTab === 'users') { loadUsers(userPage); loadUserDeptMap() }
   }, [activeTab, userPage])
 
   useEffect(() => {
@@ -1068,6 +1210,7 @@ export default function Admin() {
                     <th className="text-left px-4 py-3 font-medium text-gray-600">Nombre</th>
                     <th className="text-left px-4 py-3 font-medium text-gray-600">Email</th>
                     <th className="text-left px-4 py-3 font-medium text-gray-600">Rol</th>
+                    <th className="text-left px-4 py-3 font-medium text-gray-600">Departamentos</th>
                     <th className="text-left px-4 py-3 font-medium text-gray-600">Estado</th>
                     <th className="px-4 py-3" />
                   </tr>
@@ -1081,6 +1224,32 @@ export default function Admin() {
                         <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${ROLE_BADGE[u.role] ?? 'bg-gray-100 text-gray-600'}`}>
                           {ROLE_LABEL[u.role] ?? u.role}
                         </span>
+                      </td>
+                      <td className="px-4 py-3">
+                        <div className="flex flex-wrap gap-1">
+                          {(() => {
+                            const deptNames = userDeptMap.get(u.id) ?? []
+                            const visible = deptNames.slice(0, 2)
+                            const extra = deptNames.length - 2
+                            return (
+                              <>
+                                {visible.map(name => (
+                                  <span key={name} className="px-2 py-0.5 rounded-full text-xs font-medium bg-purple-50 text-purple-700 whitespace-nowrap">
+                                    {name}
+                                  </span>
+                                ))}
+                                {extra > 0 && (
+                                  <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-500 whitespace-nowrap">
+                                    +{extra} más
+                                  </span>
+                                )}
+                                {deptNames.length === 0 && (
+                                  <span className="text-gray-300 text-xs">—</span>
+                                )}
+                              </>
+                            )
+                          })()}
+                        </div>
                       </td>
                       <td className="px-4 py-3">
                         <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${u.is_active ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-400'}`}>
@@ -1122,7 +1291,7 @@ export default function Admin() {
             <EditUserModal
               user={editingUser}
               onClose={() => setEditingUser(null)}
-              onSaved={() => { setEditingUser(null); loadUsers(userPage) }}
+              onSaved={() => { setEditingUser(null); loadUsers(userPage); loadUserDeptMap() }}
             />
           )}
         </>
